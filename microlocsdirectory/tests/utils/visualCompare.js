@@ -43,11 +43,7 @@ async function getIgnoreRegions(page, selectors) {
 	return regions;
 }
 
-async function compareImages(
-	current,
-	baseline,
-	ignoreRegions = [],
-) {
+async function compareImages(current, baseline, ignoreRegions = []) {
 	const pmatch = await loadPixelmatch(); // Load pixelmatch dynamically
 
 	const { width, height } = baseline;
@@ -127,7 +123,7 @@ async function compareWithIgnoredRegions(
 
 	// If dimensions don't match, regenerate the baseline
 	if (current.width !== baseline.width || current.height !== baseline.height) {
-		console.log(
+		console.warn(
 			`[Baseline Mismatch] Current: ${current.width}x${current.height}, Baseline: ${baseline.width}x${baseline.height} - Regenerating...`,
 		);
 		fs.writeFileSync(baselinePath, screenshotBuffer);
