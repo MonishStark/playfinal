@@ -29,7 +29,9 @@ function clampRectToImage(rect, width, height) {
 }
 
 function applyIgnoreRects(actualPng, expectedPng, ignoreRects) {
-	if (!ignoreRects || ignoreRects.length === 0) return;
+	if (!ignoreRects || ignoreRects.length === 0) return actualPng.data;
+
+	const actualData = Buffer.from(actualPng.data);
 	const width = actualPng.width;
 	const height = actualPng.height;
 
@@ -42,13 +44,15 @@ function applyIgnoreRects(actualPng, expectedPng, ignoreRects) {
 			const rowLength = (clamped.x2 - clamped.x1) * 4;
 			// Force actual pixels to match expected pixels inside ignored region
 			expectedPng.data.copy(
-				actualPng.data,
+				actualData,
 				rowStart,
 				rowStart,
 				rowStart + rowLength,
 			);
 		}
 	}
+
+	return actualData;
 }
 
 async function compareScreenshotToSnapshot({
@@ -102,11 +106,11 @@ async function compareScreenshotToSnapshot({
 	}
 
 	const diffPng = new PNG({ width: actualPng.width, height: actualPng.height });
-	applyIgnoreRects(actualPng, expectedPng, ignoreRects);
+	const comparedActualData = applyIgnoreRects(actualPng, expectedPng, ignoreRects);
 
 	const diffPixels = pixelmatch(
 		expectedPng.data,
-		actualPng.data,
+		comparedActualData,
 		diffPng.data,
 		actualPng.width,
 		actualPng.height,
