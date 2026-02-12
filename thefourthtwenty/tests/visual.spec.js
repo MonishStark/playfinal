@@ -139,7 +139,7 @@ async function markStillLookingHeresMoreForIgnore(page) {
 	const startedAt = Date.now();
 
 	while (Date.now() - startedAt < timeoutMs) {
-		const marked = await page.evaluate(() => {
+		const marked = await page.evaluate((maxIterationDepth) => {
 			const targetHeadingText = "STILL LOOKING? HERE'S MORE";
 			const stopHeadingText = "DON'T MISS MY NEXT POST";
 			const headingSelectors = "h1,h2,h3,h4,h5,h6";
@@ -156,7 +156,7 @@ async function markStillLookingHeresMoreForIgnore(page) {
 			let node = heading;
 			for (
 				let depth = 0;
-				depth < MAX_ITERATION_DEPTH && node && node !== document.body;
+				depth < maxIterationDepth && node && node !== document.body;
 				depth++
 			) {
 				if (node.matches && node.matches(containerSelector)) {
@@ -191,7 +191,7 @@ async function markStillLookingHeresMoreForIgnore(page) {
 				"still-looking-heres-more",
 			);
 			return true;
-		});
+		}, MAX_ITERATION_DEPTH);
 
 		if (marked) return;
 		await page.waitForTimeout(pollEveryMs);
