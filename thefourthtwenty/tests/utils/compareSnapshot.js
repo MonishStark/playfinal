@@ -1,6 +1,6 @@
 /** @format */
 
-const fs = require("fs");
+const fs = require("fs").promises;
 const path = require("path");
 const { PNG } = require("pngjs");
 const pixelmatchModule = require("pixelmatch");
@@ -68,18 +68,23 @@ async function compareScreenshotToSnapshot({
 			testInfo.config.updateSnapshots !== "none") ||
 		false;
 
-	if (!fs.existsSync(snapshotPath)) {
-		if (!updateMode) {
-			throw new Error(
-				`Snapshot missing: ${path.relative(process.cwd(), snapshotPath)}`,
-			);
+	let expectedBuffer;
+	try {
+		expectedBuffer = await fs.readFile(snapshotPath);
+	} catch (error) {
+		if (error && error.code === "ENOENT") {
+			if (!updateMode) {
+				throw new Error(
+					`Snapshot missing: ${path.relative(process.cwd(), snapshotPath)}`,
+				);
+			}
+			await fs.mkdir(path.dirname(snapshotPath), { recursive: true });
+			await fs.writeFile(snapshotPath, actualBuffer);
+			return;
 		}
-		fs.mkdirSync(path.dirname(snapshotPath), { recursive: true });
-		fs.writeFileSync(snapshotPath, actualBuffer);
-		return;
+		throw error;
 	}
 
-	const expectedBuffer = fs.readFileSync(snapshotPath);
 	const expectedPng = PNG.sync.read(expectedBuffer);
 	const actualPng = PNG.sync.read(actualBuffer);
 
@@ -88,7 +93,7 @@ async function compareScreenshotToSnapshot({
 		expectedPng.height !== actualPng.height
 	) {
 		if (updateMode) {
-			fs.writeFileSync(snapshotPath, actualBuffer);
+			await fs.writeFile(snapshotPath, actualBuffer);
 			return;
 		}
 		throw new Error(
@@ -115,13 +120,13 @@ async function compareScreenshotToSnapshot({
 
 	if (ratio > maxDiffPixelRatio) {
 		if (updateMode) {
-			fs.writeFileSync(snapshotPath, actualBuffer);
+			await fs.writeFile(snapshotPath, actualBuffer);
 			return;
 		}
 
 		const diffPath = snapshotPath.replace(/\.png$/i, ".diff.png");
 		const diffBuffer = PNG.sync.write(diffPng);
-		fs.writeFileSync(diffPath, diffBuffer);
+		await fs.writeFile(diffPath, diffBuffer);
 
 		if (testInfo) {
 			await testInfo.attach(`Expected – ${pageName}`, {
