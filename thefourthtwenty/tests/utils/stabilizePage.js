@@ -80,10 +80,10 @@ async function stabilizePage(page, isMobile = false) {
 		".cc-allow",
 		".cc-dismiss",
 		"[data-cookie-accept]",
-		"button[contains(text(), 'Accept')]",
-		"button[contains(text(), 'Allow')]",
-		"button[contains(text(), 'Got it')]",
-		"button[contains(text(), 'I understand')]",
+		"button:has-text('Accept')",
+		"button:has-text('Allow')",
+		"button:has-text('Got it')",
+		"button:has-text('I understand')",
 		".moove-gdpr-infobar-allow-all",
 	];
 

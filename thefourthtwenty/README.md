@@ -56,13 +56,16 @@ across all configured devices.
 - `/category/retirement/` – Category: Retirement
 - `/category/other-stuff/` – Category: Other Stuff
 
-### C. Blog Posts (5 Endpoints)
+### C. Blog Posts (8 Endpoints)
 
 - `/of-life-and-death/` – Of Life And Death
 - `/welcome-to-my-existential-crisis/` – Welcome To My Existential Crisis
 - `/my-home-and-native-land/` – My Home And Native Land
 - `/weekly-wtfs/` – Weekly WTFs
 - `/weekly-wtf/floor-crossers/` – Weekly WTF: Floor Crossers
+- `/welcome-home-baby/` – Welcome Home Baby
+- `/head-and-shoulder-knees-and-toes/` – Head And Shoulders Knees And Toes
+- `/weekly-wtf/parking/` – Weekly WTF: Parking
 
 ---
 

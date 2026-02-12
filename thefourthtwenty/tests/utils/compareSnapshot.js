@@ -38,14 +38,15 @@ function applyIgnoreRects(actualPng, expectedPng, ignoreRects) {
 		if (!clamped) continue;
 
 		for (let y = clamped.y1; y < clamped.y2; y++) {
-			for (let x = clamped.x1; x < clamped.x2; x++) {
-				const idx = (y * width + x) * 4;
-				// Force actual pixels to match expected pixels inside ignored region
-				actualPng.data[idx] = expectedPng.data[idx];
-				actualPng.data[idx + 1] = expectedPng.data[idx + 1];
-				actualPng.data[idx + 2] = expectedPng.data[idx + 2];
-				actualPng.data[idx + 3] = expectedPng.data[idx + 3];
-			}
+			const rowStart = (y * width + clamped.x1) * 4;
+			const rowLength = (clamped.x2 - clamped.x1) * 4;
+			// Force actual pixels to match expected pixels inside ignored region
+			expectedPng.data.copy(
+				actualPng.data,
+				rowStart,
+				rowStart,
+				rowStart + rowLength,
+			);
 		}
 	}
 }
