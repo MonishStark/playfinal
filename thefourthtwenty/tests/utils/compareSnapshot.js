@@ -120,7 +120,8 @@ async function compareScreenshotToSnapshot({
 		}
 
 		const diffPath = snapshotPath.replace(/\.png$/i, ".diff.png");
-		fs.writeFileSync(diffPath, PNG.sync.write(diffPng));
+		const diffBuffer = PNG.sync.write(diffPng);
+		fs.writeFileSync(diffPath, diffBuffer);
 
 		if (testInfo) {
 			await testInfo.attach(`Expected – ${pageName}`, {
@@ -132,7 +133,7 @@ async function compareScreenshotToSnapshot({
 				contentType: "image/png",
 			});
 			await testInfo.attach(`Diff – ${pageName}`, {
-				body: PNG.sync.write(diffPng),
+				body: diffBuffer,
 				contentType: "image/png",
 			});
 		}
