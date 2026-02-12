@@ -1,0 +1,14 @@
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+# Local test artifacts (can be huge)
+microlocs/results.json
+microlocsdirectory/results.json
+
+# Environment Variables
+.env
