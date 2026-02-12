@@ -49,27 +49,23 @@ async function compareImages(current, baseline, ignoreRegions = []) {
 	const { width, height } = baseline;
 	const diff = new PNG({ width, height });
 
-	const baselineData = Buffer.from(baseline.data);
+	const baselineData = baseline.data;
 	const currentData = Buffer.from(current.data);
 
-	// Make ignored regions identical in both images
+	// Make ignored regions identical by copying baseline pixels into current image
 	for (const region of ignoreRegions) {
 		for (
 			let y = region.y;
 			y < Math.min(region.y + region.height, height);
 			y++
 		) {
-			for (
-				let x = region.x;
-				x < Math.min(region.x + region.width, width);
-				x++
-			) {
-				const idx = (y * width + x) * 4;
-				baselineData[idx] = currentData[idx] = 128;
-				baselineData[idx + 1] = currentData[idx + 1] = 128;
-				baselineData[idx + 2] = currentData[idx + 2] = 128;
-				baselineData[idx + 3] = currentData[idx + 3] = 255;
-			}
+			const rowStartX = Math.max(0, region.x);
+			const rowEndX = Math.min(region.x + region.width, width);
+			if (rowEndX <= rowStartX) continue;
+
+			const rowStart = (y * width + rowStartX) * 4;
+			const rowLength = (rowEndX - rowStartX) * 4;
+			baselineData.copy(currentData, rowStart, rowStart, rowStart + rowLength);
 		}
 	}
 
