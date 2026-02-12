@@ -54,9 +54,13 @@ async function compareImages(current, baseline, ignoreRegions = []) {
 
 	// Make ignored regions identical by copying baseline pixels into current image
 	for (const region of ignoreRegions) {
+		const rowStartY = Math.max(0, region.y);
+		const rowEndY = Math.min(region.y + region.height, height);
+		if (rowEndY <= rowStartY) continue;
+
 		for (
-			let y = region.y;
-			y < Math.min(region.y + region.height, height);
+			let y = rowStartY;
+			y < rowEndY;
 			y++
 		) {
 			const rowStartX = Math.max(0, region.x);
