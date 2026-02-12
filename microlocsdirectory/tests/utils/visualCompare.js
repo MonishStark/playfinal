@@ -36,7 +36,7 @@ async function getIgnoreRegions(page, selectors) {
 				}
 			}
 		} catch (e) {
-			console.warn(`[Warning] Could not find element: ${selector}`);
+			console.log(`[Warning] Could not find element: ${selector}`);
 		}
 	}
 
@@ -44,18 +44,20 @@ async function getIgnoreRegions(page, selectors) {
 }
 
 async function compareImages(
-	current,
-	baseline,
+	currentBuffer,
+	baselineBuffer,
 	ignoreRegions = [],
-	threshold = 0.1,
 ) {
 	const pmatch = await loadPixelmatch(); // Load pixelmatch dynamically
+
+	const current = PNG.sync.read(currentBuffer);
+	const baseline = PNG.sync.read(baselineBuffer);
 
 	const { width, height } = baseline;
 	const diff = new PNG({ width, height });
 
-	const baselineData = baseline.data;
-	const currentData = current.data;
+	const baselineData = Buffer.from(baseline.data);
+	const currentData = Buffer.from(current.data);
 
 	// Make ignored regions identical in both images
 	for (const region of ignoreRegions) {
@@ -85,7 +87,7 @@ async function compareImages(
 		width,
 		height,
 		{
-			threshold,
+			threshold: 0.1,
 		},
 	);
 
@@ -110,7 +112,9 @@ async function compareWithIgnoredRegions(
 	// Create baseline if it doesn't exist
 	if (!fs.existsSync(baselinePath)) {
 		const dir = path.dirname(baselinePath);
-		fs.mkdirSync(dir, { recursive: true });
+		if (!fs.existsSync(dir)) {
+			fs.mkdirSync(dir, { recursive: true });
+		}
 		fs.writeFileSync(baselinePath, screenshotBuffer);
 		return {
 			pass: true,
@@ -122,25 +126,29 @@ async function compareWithIgnoredRegions(
 
 	const baselineBuffer = fs.readFileSync(baselinePath);
 
-	// Check dimensions first - if they don't match, update baseline
+	// Check dimensions before comparing
 	const current = PNG.sync.read(screenshotBuffer);
 	const baseline = PNG.sync.read(baselineBuffer);
 
+	// If dimensions don't match, regenerate the baseline
 	if (current.width !== baseline.width || current.height !== baseline.height) {
-		console.info(
-			`[Dimension Mismatch] Baseline: ${baseline.width}x${baseline.height}, Current: ${current.width}x${current.height}`,
+		console.log(
+			`[Baseline Mismatch] Current: ${current.width}x${current.height}, Baseline: ${baseline.width}x${baseline.height} - Regenerating...`,
 		);
-		console.info(`[Update] Writing new baseline with current dimensions...`);
 		fs.writeFileSync(baselinePath, screenshotBuffer);
 		return {
 			pass: true,
 			isNewBaseline: true,
-			message: `✅ Baseline updated (dimension changed from ${baseline.width}x${baseline.height} to ${current.width}x${current.height})`,
+			message: `✅ Baseline regenerated (size changed from ${baseline.width}x${baseline.height} to ${current.width}x${current.height})`,
 			ignoredRegions: ignoreRegions.length,
 		};
 	}
 
-	const result = await compareImages(current, baseline, ignoreRegions);
+	const result = await compareImages(
+		screenshotBuffer,
+		baselineBuffer,
+		ignoreRegions,
+	); // Added await
 
 	const pass = result.diffPercent <= maxDiffPixelRatio;
 
