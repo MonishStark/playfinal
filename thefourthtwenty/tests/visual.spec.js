@@ -6,81 +6,108 @@ const { stabilizePage } = require("./utils/stabilizePage");
 const path = require("path");
 const { compareScreenshotToSnapshot } = require("./utils/compareSnapshot");
 
+const IGNORE_MARK_TIMEOUT_MS = 7000;
+const IGNORE_MARK_POLL_INTERVAL_MS = 250;
+
+const MIN_IMG_WIDTH = 900;
+const MIN_IMG_HEIGHT = 250;
+const MIN_IMG_TOP = -50;
+const MAX_IMG_TOP = 550;
+
+const MAX_ITERATION_DEPTH = 12;
+const MAX_DIFF_PIXEL_RATIO = 0.02;
+
+const STILL_LOOKING_DYNAMIC_POST_PATHS = [
+	"/of-life-and-death/",
+	"/welcome-to-my-existential-crisis/",
+	"/my-home-and-native-land/",
+];
+
 async function markBrowseByCategoryForIgnore(page) {
-	const timeoutMs = 7000;
-	const pollEveryMs = 250;
-	const startedAt = Date.now();
+	await page
+		.waitForFunction(
+			() => {
+				const headingText = "BROWSE BY CATEGORY";
+				const headingSelectors = "h1,h2,h3,h4,h5,h6";
+				const containerSelectors = "section,div,main,article";
 
-	while (Date.now() - startedAt < timeoutMs) {
-		const marked = await page.evaluate(() => {
-			const headingText = "BROWSE BY CATEGORY";
-			const headingSelectors = "h1,h2,h3,h4,h5,h6";
-			const containerSelectors = "section,div,main,article";
+				const heading = Array.from(
+					document.querySelectorAll(headingSelectors),
+				).find(
+					(el) =>
+						(el.textContent || "").replace(/\s+/g, " ").trim().toUpperCase() ===
+						headingText,
+				);
+				if (!heading) return false;
 
-			const heading = Array.from(
-				document.querySelectorAll(headingSelectors),
-			).find(
-				(el) =>
-					(el.textContent || "").replace(/\s+/g, " ").trim().toUpperCase() ===
-					headingText,
-			);
-			if (!heading) return false;
+				const container = heading.closest(containerSelectors);
+				if (!container) return false;
 
-			const container = heading.closest(containerSelectors);
-			if (!container) return false;
-			container.setAttribute("data-pw-ignore-visual", "browse-by-category");
-			return true;
-		});
-
-		if (marked) return;
-		await page.waitForTimeout(pollEveryMs);
-	}
+				container.setAttribute("data-pw-ignore-visual", "browse-by-category");
+				return true;
+			},
+			undefined,
+			{
+				timeout: IGNORE_MARK_TIMEOUT_MS,
+				polling: IGNORE_MARK_POLL_INTERVAL_MS,
+			},
+		)
+		.catch(() => {});
 }
 
 async function markHomeHeroForIgnore(page) {
-	const timeoutMs = 7000;
-	const pollEveryMs = 250;
-	const startedAt = Date.now();
+	await page
+		.waitForFunction(
+			({ minImgWidth, minImgHeight, minImgTop, maxImgTop }) => {
+				const containerSelectors = [
+					'.elementor-element[data-element_type="section"]',
+					".elementor-section",
+					"section",
+					"div",
+					"main",
+					"article",
+				].join(",");
 
-	while (Date.now() - startedAt < timeoutMs) {
-		const marked = await page.evaluate(() => {
-			const containerSelectors = [
-				'.elementor-element[data-element_type="section"]',
-				".elementor-section",
-				"section",
-				"div",
-				"main",
-				"article",
-			].join(",");
+				const images = Array.from(
+					document.querySelectorAll("main img, .elementor img, img"),
+				);
+				if (images.length === 0) return false;
 
-			const images = Array.from(
-				document.querySelectorAll("main img, .elementor img, img"),
-			);
-			if (images.length === 0) return false;
+				let bestImg = null;
+				let bestScore = 0;
 
-			let bestImg = null;
-			let bestScore = 0;
-			for (const img of images) {
-				const rect = img.getBoundingClientRect();
-				if (rect.width < 900 || rect.height < 250) continue;
-				if (rect.top < -50 || rect.top > 550) continue;
-				const score = rect.width * rect.height;
-				if (score > bestScore) {
-					bestScore = score;
-					bestImg = img;
+				for (const img of images) {
+					const rect = img.getBoundingClientRect();
+					if (rect.width < minImgWidth || rect.height < minImgHeight) continue;
+					if (rect.top < minImgTop || rect.top > maxImgTop) continue;
+
+					const score = rect.width * rect.height;
+					if (score > bestScore) {
+						bestScore = score;
+						bestImg = img;
+					}
 				}
-			}
-			if (!bestImg) return false;
 
-			const container = bestImg.closest(containerSelectors);
-			if (!container) return false;
-			container.setAttribute("data-pw-ignore-visual", "home-hero");
-			return true;
-		});
+				if (!bestImg) return false;
 
-		if (marked) return;
-		await page.waitForTimeout(pollEveryMs);
-	}
+				const container = bestImg.closest(containerSelectors);
+				if (!container) return false;
+
+				container.setAttribute("data-pw-ignore-visual", "home-hero");
+				return true;
+			},
+			{
+				minImgWidth: MIN_IMG_WIDTH,
+				minImgHeight: MIN_IMG_HEIGHT,
+				minImgTop: MIN_IMG_TOP,
+				maxImgTop: MAX_IMG_TOP,
+			},
+			{
+				timeout: IGNORE_MARK_TIMEOUT_MS,
+				polling: IGNORE_MARK_POLL_INTERVAL_MS,
+			},
+		)
+		.catch(() => {});
 }
 
 async function markDynamicPostsForIgnore(page) {
@@ -107,8 +134,8 @@ async function markDynamicPostsForIgnore(page) {
 }
 
 async function markStillLookingHeresMoreForIgnore(page) {
-	const timeoutMs = 7000;
-	const pollEveryMs = 250;
+	const timeoutMs = IGNORE_MARK_TIMEOUT_MS;
+	const pollEveryMs = IGNORE_MARK_POLL_INTERVAL_MS;
 	const startedAt = Date.now();
 
 	while (Date.now() - startedAt < timeoutMs) {
@@ -129,7 +156,7 @@ async function markStillLookingHeresMoreForIgnore(page) {
 			let node = heading;
 			for (
 				let depth = 0;
-				depth < 12 && node && node !== document.body;
+				depth < MAX_ITERATION_DEPTH && node && node !== document.body;
 				depth++
 			) {
 				if (node.matches && node.matches(containerSelector)) {
@@ -244,11 +271,8 @@ test.describe("Visual Regression Tests - thefourthtwenty.ca", () => {
 			const isHome = pageInfo.name === "01_Home";
 			const isCategoryPage = pageInfo.path.startsWith("/category/");
 			const isWeeklyWtfsListing = pageInfo.path === "/weekly-wtfs/";
-			const isStillLookingDynamicPost = [
-				"/of-life-and-death/",
-				"/welcome-to-my-existential-crisis/",
-				"/my-home-and-native-land/",
-			].includes(pageInfo.path);
+			const isStillLookingDynamicPost =
+				STILL_LOOKING_DYNAMIC_POST_PATHS.includes(pageInfo.path);
 			const shouldHideDynamicPostsGrid = isCategoryPage || isWeeklyWtfsListing;
 
 			if (isHome) {
@@ -275,7 +299,7 @@ test.describe("Visual Regression Tests - thefourthtwenty.ca", () => {
 				snapshotsDir,
 				actualBuffer: screenshot,
 				ignoreRects,
-				maxDiffPixelRatio: 0.02,
+				maxDiffPixelRatio: MAX_DIFF_PIXEL_RATIO,
 				testInfo,
 			});
 		});

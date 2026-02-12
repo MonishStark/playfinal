@@ -95,10 +95,10 @@ npx playwright install
 
 ### Step 2: Run Tests
 
-From the thefouthtwenty App folder:
+From the thefourthtwenty App folder:
 
 ```bash
-cd thefouthtwenty
+cd thefourthtwenty
 npx playwright test
 ```
 
