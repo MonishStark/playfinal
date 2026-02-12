@@ -156,7 +156,7 @@ async function markStillLookingHeresMoreForIgnore(page) {
 					depth < maxIterationDepth && node && node !== document.body;
 					depth++
 				) {
-					if (node.matches && node.matches(containerSelector)) {
+					if (node.matches(containerSelector)) {
 						const key = toKey(node.textContent);
 						if (
 							key.includes(targetHeadingText) &&
