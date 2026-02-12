@@ -134,68 +134,68 @@ async function markDynamicPostsForIgnore(page) {
 }
 
 async function markStillLookingHeresMoreForIgnore(page) {
-	const timeoutMs = IGNORE_MARK_TIMEOUT_MS;
-	const pollEveryMs = IGNORE_MARK_POLL_INTERVAL_MS;
-	const startedAt = Date.now();
+	await page
+		.waitForFunction(
+			(maxIterationDepth) => {
+				const targetHeadingText = "STILL LOOKING? HERE'S MORE";
+				const stopHeadingText = "DON'T MISS MY NEXT POST";
+				const headingSelectors = "h1,h2,h3,h4,h5,h6";
+				const containerSelector = "section,div,main,article";
 
-	while (Date.now() - startedAt < timeoutMs) {
-		const marked = await page.evaluate((maxIterationDepth) => {
-			const targetHeadingText = "STILL LOOKING? HERE'S MORE";
-			const stopHeadingText = "DON'T MISS MY NEXT POST";
-			const headingSelectors = "h1,h2,h3,h4,h5,h6";
-			const containerSelector = "section,div,main,article";
+				const normalize = (s) => (s || "").replace(/\s+/g, " ").trim();
+				const toKey = (s) => normalize(s).toUpperCase();
 
-			const normalize = (s) => (s || "").replace(/\s+/g, " ").trim();
-			const toKey = (s) => normalize(s).toUpperCase();
+				const heading = Array.from(
+					document.querySelectorAll(headingSelectors),
+				).find((el) => toKey(el.textContent) === targetHeadingText);
+				if (!heading) return false;
 
-			const heading = Array.from(
-				document.querySelectorAll(headingSelectors),
-			).find((el) => toKey(el.textContent) === targetHeadingText);
-			if (!heading) return false;
-
-			let node = heading;
-			for (
-				let depth = 0;
-				depth < maxIterationDepth && node && node !== document.body;
-				depth++
-			) {
-				if (node.matches && node.matches(containerSelector)) {
-					const key = toKey(node.textContent);
-					if (
-						key.includes(targetHeadingText) &&
-						!key.includes(stopHeadingText)
-					) {
-						// Prefer a container that actually contains a related-posts grid/cards.
-						const hasCards =
-							node.querySelector("article") ||
-							node.querySelector(".elementor-post") ||
-							node.querySelector(".elementor-posts") ||
-							node.querySelector(".elementor-posts-container") ||
-							node.querySelector("a[href]");
-						if (hasCards) {
-							node.setAttribute(
-								"data-pw-ignore-visual",
-								"still-looking-heres-more",
-							);
-							return true;
+				let node = heading;
+				for (
+					let depth = 0;
+					depth < maxIterationDepth && node && node !== document.body;
+					depth++
+				) {
+					if (node.matches && node.matches(containerSelector)) {
+						const key = toKey(node.textContent);
+						if (
+							key.includes(targetHeadingText) &&
+							!key.includes(stopHeadingText)
+						) {
+							// Prefer a container that actually contains a related-posts grid/cards.
+							const hasCards =
+								node.querySelector("article") ||
+								node.querySelector(".elementor-post") ||
+								node.querySelector(".elementor-posts") ||
+								node.querySelector(".elementor-posts-container") ||
+								node.querySelector("a[href]");
+							if (hasCards) {
+								node.setAttribute(
+									"data-pw-ignore-visual",
+									"still-looking-heres-more",
+								);
+								return true;
+							}
 						}
 					}
+					node = node.parentElement;
 				}
-				node = node.parentElement;
-			}
 
-			const container = heading.closest(containerSelector);
-			if (!container) return false;
-			container.setAttribute(
-				"data-pw-ignore-visual",
-				"still-looking-heres-more",
-			);
-			return true;
-		}, MAX_ITERATION_DEPTH);
-
-		if (marked) return;
-		await page.waitForTimeout(pollEveryMs);
-	}
+				const container = heading.closest(containerSelector);
+				if (!container) return false;
+				container.setAttribute(
+					"data-pw-ignore-visual",
+					"still-looking-heres-more",
+				);
+				return true;
+			},
+			MAX_ITERATION_DEPTH,
+			{
+				timeout: IGNORE_MARK_TIMEOUT_MS,
+				polling: IGNORE_MARK_POLL_INTERVAL_MS,
+			},
+		)
+		.catch(() => {});
 }
 
 async function getIgnoreRects(page) {
