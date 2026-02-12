@@ -10,22 +10,6 @@
  * - Motion effects
  */
 
-// Timing constants
-const COOKIE_BANNER_WAIT_MS = 500;
-const MOBILE_SCROLL_STEP_PX = 150;
-const DESKTOP_SCROLL_STEP_PX = 300;
-const MOBILE_SCROLL_DELAY_MS = 200;
-const DESKTOP_SCROLL_DELAY_MS = 100;
-const SCROLL_TOP_DELAY_MS = 1000;
-const SCROLL_BOTTOM_DELAY_MS = 500;
-const IMAGE_LOAD_TIMEOUT_MS = 5000;
-const VIDEO_IFRAME_WAIT_MS = 1500;
-const VIDEO_SCROLL_SETTLE_MS = 1000;
-const NETWORK_IDLE_TIMEOUT_MS = 15000;
-const MOBILE_FINAL_SETTLE_MS = 3000;
-const DESKTOP_FINAL_SETTLE_MS = 2000;
-const VIDEO_IFRAME_SCROLL_TIMEOUT_MS = 5000;
-
 async function stabilizePage(page, isMobile = false) {
 	// Ensure fonts are ready
 	await page.evaluate(async () => {
@@ -76,10 +60,10 @@ async function stabilizePage(page, isMobile = false) {
 		".cc-allow",
 		".cc-dismiss",
 		"[data-cookie-accept]",
-		"button:has-text('Accept')",
-		"button:has-text('Allow')",
-		"button:has-text('Got it')",
-		"button:has-text('I understand')",
+		"button[contains(text(), 'Accept')]",
+		"button[contains(text(), 'Allow')]",
+		"button[contains(text(), 'Got it')]",
+		"button[contains(text(), 'I understand')]",
 		".moove-gdpr-infobar-allow-all",
 	];
 
@@ -87,7 +71,7 @@ async function stabilizePage(page, isMobile = false) {
 		const btn = page.locator(selector).first();
 		if (await btn.isVisible().catch(() => false)) {
 			await btn.click({ force: true }).catch(() => {});
-			await page.waitForTimeout(COOKIE_BANNER_WAIT_MS);
+			await page.waitForTimeout(500);
 			break;
 		}
 	}
@@ -212,58 +196,50 @@ async function stabilizePage(page, isMobile = false) {
 	/* =====================================================
      Scroll to hydrate lazy content
      ===================================================== */
-	const scrollConfig = {
-		scrollStep: isMobile ? MOBILE_SCROLL_STEP_PX : DESKTOP_SCROLL_STEP_PX,
-		scrollDelay: isMobile ? MOBILE_SCROLL_DELAY_MS : DESKTOP_SCROLL_DELAY_MS,
-		scrollTopDelay: SCROLL_TOP_DELAY_MS,
-		scrollBottomDelay: SCROLL_BOTTOM_DELAY_MS,
-	};
+	await page.evaluate(async (mobile) => {
+		const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
-	await page.evaluate(
-		async ({ scrollStep, scrollDelay, scrollTopDelay, scrollBottomDelay }) => {
-			const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+		const getScrollHeight = () => {
+			return Math.max(
+				document.body.scrollHeight,
+				document.documentElement.scrollHeight,
+				document.body.offsetHeight,
+				document.documentElement.offsetHeight,
+			);
+		};
 
-			const getScrollHeight = () => {
-				return Math.max(
-					document.body.scrollHeight,
-					document.documentElement.scrollHeight,
-					document.body.offsetHeight,
-					document.documentElement.offsetHeight,
-				);
-			};
+		let height = getScrollHeight();
+		const scrollStep = mobile ? 150 : 300;
+		const scrollDelay = mobile ? 200 : 100;
 
-			let height = getScrollHeight();
+		// Scroll down
+		for (let y = 0; y <= height; y += scrollStep) {
+			window.scrollTo(0, y);
+			await delay(scrollDelay);
 
-			// Scroll down
-			for (let y = 0; y <= height; y += scrollStep) {
-				window.scrollTo(0, y);
-				await delay(scrollDelay);
-
-				const newHeight = getScrollHeight();
-				if (newHeight > height) {
-					height = newHeight;
-				}
+			const newHeight = getScrollHeight();
+			if (newHeight > height) {
+				height = newHeight;
 			}
+		}
 
-			window.scrollTo(0, height);
-			await delay(scrollTopDelay);
+		window.scrollTo(0, height);
+		await delay(1000);
 
-			// Scroll back up
-			for (let y = height; y >= 0; y -= scrollStep) {
-				window.scrollTo(0, y);
-				await delay(scrollDelay);
-			}
+		// Scroll back up
+		for (let y = height; y >= 0; y -= scrollStep) {
+			window.scrollTo(0, y);
+			await delay(scrollDelay);
+		}
 
-			window.scrollTo(0, 0);
-			await delay(scrollBottomDelay);
-		},
-		scrollConfig,
-	);
+		window.scrollTo(0, 0);
+		await delay(500);
+	}, isMobile);
 
 	/* =====================================================
      Wait for images to load
      ===================================================== */
-	await page.evaluate(async (imageTimeout) => {
+	await page.evaluate(async () => {
 		const images = Array.from(document.querySelectorAll("img"));
 		await Promise.all(
 			images.map((img) => {
@@ -271,11 +247,11 @@ async function stabilizePage(page, isMobile = false) {
 				return new Promise((resolve) => {
 					img.onload = resolve;
 					img.onerror = resolve;
-					setTimeout(resolve, imageTimeout);
+					setTimeout(resolve, 5000);
 				});
 			}),
 		);
-	}, IMAGE_LOAD_TIMEOUT_MS);
+	});
 
 	/* =====================================================
      Handle video iframes (YouTube, Vimeo)
@@ -291,21 +267,21 @@ async function stabilizePage(page, isMobile = false) {
 		for (let i = 0; i < iframeCount; i++) {
 			await videoIframes
 				.nth(i)
-				.scrollIntoViewIfNeeded({ timeout: VIDEO_IFRAME_SCROLL_TIMEOUT_MS })
+				.scrollIntoViewIfNeeded({ timeout: 5000 })
 				.catch(() => {});
-			await page.waitForTimeout(VIDEO_IFRAME_WAIT_MS);
+			await page.waitForTimeout(1500);
 		}
 
 		await page.evaluate(() => window.scrollTo(0, 0));
-		await page.waitForTimeout(VIDEO_SCROLL_SETTLE_MS);
+		await page.waitForTimeout(1000);
 	}
 
 	/* =====================================================
      Wait for network to settle
      ===================================================== */
 	await Promise.race([
-		page.waitForLoadState("networkidle", { timeout: NETWORK_IDLE_TIMEOUT_MS }),
-		page.waitForTimeout(NETWORK_IDLE_TIMEOUT_MS),
+		page.waitForLoadState("networkidle", { timeout: 15000 }),
+		page.waitForTimeout(15000),
 	]).catch(() => {
 		console.log("Network idle timeout - proceeding");
 	});
@@ -324,9 +300,7 @@ async function stabilizePage(page, isMobile = false) {
 		document.body.offsetHeight;
 	});
 
-	await page.waitForTimeout(
-		isMobile ? MOBILE_FINAL_SETTLE_MS : DESKTOP_FINAL_SETTLE_MS,
-	);
+	await page.waitForTimeout(isMobile ? 3000 : 2000);
 }
 
 module.exports = { stabilizePage };

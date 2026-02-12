@@ -6,93 +6,81 @@ const { stabilizePage } = require("./utils/stabilizePage");
 const path = require("path");
 const { compareScreenshotToSnapshot } = require("./utils/compareSnapshot");
 
-// Constants for element detection polling
-const ELEMENT_WAIT_TIMEOUT_MS = 7000;
-const ELEMENT_POLL_INTERVAL_MS = 250;
-
-// Constants for hero image detection thresholds
-const MIN_IMG_WIDTH = 900;
-const MIN_IMG_HEIGHT = 250;
-const MIN_IMG_TOP = -50;
-const MAX_IMG_TOP = 550;
-
-// Visual comparison threshold
-const MAX_DIFF_PIXEL_RATIO = 0.02;
-
-// Posts with dynamic "Still Looking" sections
-const STILL_LOOKING_DYNAMIC_POST_PATHS = [
-	"/of-life-and-death/",
-	"/welcome-to-my-existential-crisis/",
-	"/my-home-and-native-land/",
-];
-
 async function markBrowseByCategoryForIgnore(page) {
-	await page
-		.waitForFunction(
-			() => {
-				const headingText = "BROWSE BY CATEGORY";
-				const headingSelectors = "h1,h2,h3,h4,h5,h6";
-				const containerSelectors = "section,div,main,article";
+	const timeoutMs = 7000;
+	const pollEveryMs = 250;
+	const startedAt = Date.now();
 
-				const heading = Array.from(
-					document.querySelectorAll(headingSelectors),
-				).find(
-					(el) =>
-						(el.textContent || "").replace(/\s+/g, " ").trim().toUpperCase() ===
-						headingText,
-				);
-				if (!heading) return false;
+	while (Date.now() - startedAt < timeoutMs) {
+		const marked = await page.evaluate(() => {
+			const headingText = "BROWSE BY CATEGORY";
+			const headingSelectors = "h1,h2,h3,h4,h5,h6";
+			const containerSelectors = "section,div,main,article";
 
-				const container = heading.closest(containerSelectors);
-				if (!container) return false;
-				container.setAttribute("data-pw-ignore-visual", "browse-by-category");
-				return true;
-			},
-			{ timeout: ELEMENT_WAIT_TIMEOUT_MS, polling: ELEMENT_POLL_INTERVAL_MS },
-		)
-		.catch(() => {});
+			const heading = Array.from(
+				document.querySelectorAll(headingSelectors),
+			).find(
+				(el) =>
+					(el.textContent || "").replace(/\s+/g, " ").trim().toUpperCase() ===
+					headingText,
+			);
+			if (!heading) return false;
+
+			const container = heading.closest(containerSelectors);
+			if (!container) return false;
+			container.setAttribute("data-pw-ignore-visual", "browse-by-category");
+			return true;
+		});
+
+		if (marked) return;
+		await page.waitForTimeout(pollEveryMs);
+	}
 }
 
 async function markHomeHeroForIgnore(page) {
-	await page
-		.waitForFunction(
-			() => {
-				const containerSelectors = [
-					'.elementor-element[data-element_type="section"]',
-					".elementor-section",
-					"section",
-					"div",
-					"main",
-					"article",
-				].join(",");
+	const timeoutMs = 7000;
+	const pollEveryMs = 250;
+	const startedAt = Date.now();
 
-				const images = Array.from(
-					document.querySelectorAll("main img, .elementor img, img"),
-				);
-				if (images.length === 0) return false;
+	while (Date.now() - startedAt < timeoutMs) {
+		const marked = await page.evaluate(() => {
+			const containerSelectors = [
+				'.elementor-element[data-element_type="section"]',
+				".elementor-section",
+				"section",
+				"div",
+				"main",
+				"article",
+			].join(",");
 
-				let bestImg = null;
-				let bestScore = 0;
-				for (const img of images) {
-					const rect = img.getBoundingClientRect();
-					if (rect.width < MIN_IMG_WIDTH || rect.height < MIN_IMG_HEIGHT) continue;
-					if (rect.top < MIN_IMG_TOP || rect.top > MAX_IMG_TOP) continue;
-					const score = rect.width * rect.height;
-					if (score > bestScore) {
-						bestScore = score;
-						bestImg = img;
-					}
+			const images = Array.from(
+				document.querySelectorAll("main img, .elementor img, img"),
+			);
+			if (images.length === 0) return false;
+
+			let bestImg = null;
+			let bestScore = 0;
+			for (const img of images) {
+				const rect = img.getBoundingClientRect();
+				if (rect.width < 900 || rect.height < 250) continue;
+				if (rect.top < -50 || rect.top > 550) continue;
+				const score = rect.width * rect.height;
+				if (score > bestScore) {
+					bestScore = score;
+					bestImg = img;
 				}
-				if (!bestImg) return false;
+			}
+			if (!bestImg) return false;
 
-				const container = bestImg.closest(containerSelectors);
-				if (!container) return false;
-				container.setAttribute("data-pw-ignore-visual", "home-hero");
-				return true;
-			},
-			{ timeout: ELEMENT_WAIT_TIMEOUT_MS, polling: ELEMENT_POLL_INTERVAL_MS },
-		)
-		.catch(() => {});
+			const container = bestImg.closest(containerSelectors);
+			if (!container) return false;
+			container.setAttribute("data-pw-ignore-visual", "home-hero");
+			return true;
+		});
+
+		if (marked) return;
+		await page.waitForTimeout(pollEveryMs);
+	}
 }
 
 async function markDynamicPostsForIgnore(page) {
@@ -119,14 +107,16 @@ async function markDynamicPostsForIgnore(page) {
 }
 
 async function markStillLookingHeresMoreForIgnore(page) {
-	await page
-		.waitForFunction(
-			() => {
-				const targetHeadingText = "STILL LOOKING? HERE'S MORE";
-				const stopHeadingText = "DON'T MISS MY NEXT POST";
-				const headingSelectors = "h1,h2,h3,h4,h5,h6";
-				const containerSelector = "section,div,main,article";
-				const MAX_ITERATION_DEPTH = 12;
+	const timeoutMs = 7000;
+	const pollEveryMs = 250;
+	const startedAt = Date.now();
+
+	while (Date.now() - startedAt < timeoutMs) {
+		const marked = await page.evaluate(() => {
+			const targetHeadingText = "STILL LOOKING? HERE'S MORE";
+			const stopHeadingText = "DON'T MISS MY NEXT POST";
+			const headingSelectors = "h1,h2,h3,h4,h5,h6";
+			const containerSelector = "section,div,main,article";
 
 			const normalize = (s) => (s || "").replace(/\s+/g, " ").trim();
 			const toKey = (s) => normalize(s).toUpperCase();
@@ -139,10 +129,10 @@ async function markStillLookingHeresMoreForIgnore(page) {
 			let node = heading;
 			for (
 				let depth = 0;
-				depth < MAX_ITERATION_DEPTH && node && node !== document.body;
+				depth < 12 && node && node !== document.body;
 				depth++
 			) {
-				if (node?.matches?.(containerSelector)) {
+				if (node.matches && node.matches(containerSelector)) {
 					const key = toKey(node.textContent);
 					if (
 						key.includes(targetHeadingText) &&
@@ -174,10 +164,11 @@ async function markStillLookingHeresMoreForIgnore(page) {
 				"still-looking-heres-more",
 			);
 			return true;
-		},
-		{ timeout: ELEMENT_WAIT_TIMEOUT_MS, polling: ELEMENT_POLL_INTERVAL_MS },
-	)
-	.catch(() => {});
+		});
+
+		if (marked) return;
+		await page.waitForTimeout(pollEveryMs);
+	}
 }
 
 async function getIgnoreRects(page) {
@@ -253,9 +244,11 @@ test.describe("Visual Regression Tests - thefourthtwenty.ca", () => {
 			const isHome = pageInfo.name === "01_Home";
 			const isCategoryPage = pageInfo.path.startsWith("/category/");
 			const isWeeklyWtfsListing = pageInfo.path === "/weekly-wtfs/";
-			const isStillLookingDynamicPost = STILL_LOOKING_DYNAMIC_POST_PATHS.includes(
-				pageInfo.path,
-			);
+			const isStillLookingDynamicPost = [
+				"/of-life-and-death/",
+				"/welcome-to-my-existential-crisis/",
+				"/my-home-and-native-land/",
+			].includes(pageInfo.path);
 			const shouldHideDynamicPostsGrid = isCategoryPage || isWeeklyWtfsListing;
 
 			if (isHome) {
@@ -282,7 +275,7 @@ test.describe("Visual Regression Tests - thefourthtwenty.ca", () => {
 				snapshotsDir,
 				actualBuffer: screenshot,
 				ignoreRects,
-				maxDiffPixelRatio: MAX_DIFF_PIXEL_RATIO,
+				maxDiffPixelRatio: 0.02,
 				testInfo,
 			});
 		});

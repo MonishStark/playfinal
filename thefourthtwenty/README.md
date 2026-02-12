@@ -63,13 +63,12 @@ across all configured devices.
 - `/my-home-and-native-land/` – My Home And Native Land
 - `/weekly-wtfs/` – Weekly WTFs
 - `/weekly-wtf/floor-crossers/` – Weekly WTF: Floor Crossers
-- `/welcome-home-baby/` – Welcome Home Baby
-- `/head-and-shoulder-knees-and-toes/` – Head, Shoulders, Knees and Toes
-- `/weekly-wtf/parking/` – Weekly WTF: Parking
+
+---
 
 ## 5. Execution Option A: Cloud (GitHub Actions)
 
-**Schedule:** Every Tuesday at **9:00 AM IST** (**03:30 AM UTC**).
+**Trigger:** Manual (`workflow_dispatch`)
 
 1. Navigate to the **Actions** tab.
 2. Select **The Fourth Twenty: Automation**.
@@ -99,7 +98,7 @@ npx playwright install
 From the thefouthtwenty App folder:
 
 ```bash
-cd thefourthtwenty
+cd thefouthtwenty
 npx playwright test
 ```
 
