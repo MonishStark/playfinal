@@ -10,21 +10,25 @@
  * - Motion effects
  */
 
-// Timing constants
 const COOKIE_BANNER_WAIT_MS = 500;
+
 const MOBILE_SCROLL_STEP_PX = 150;
 const DESKTOP_SCROLL_STEP_PX = 300;
 const MOBILE_SCROLL_DELAY_MS = 200;
 const DESKTOP_SCROLL_DELAY_MS = 100;
-const SCROLL_TOP_DELAY_MS = 1000;
-const SCROLL_BOTTOM_DELAY_MS = 500;
+const SCROLL_BOTTOM_SETTLE_MS = 1000;
+const SCROLL_TOP_SETTLE_MS = 500;
+
 const IMAGE_LOAD_TIMEOUT_MS = 5000;
+
+const VIDEO_IFRAME_SCROLL_TIMEOUT_MS = 5000;
 const VIDEO_IFRAME_WAIT_MS = 1500;
 const VIDEO_SCROLL_SETTLE_MS = 1000;
+
 const NETWORK_IDLE_TIMEOUT_MS = 15000;
+
 const MOBILE_FINAL_SETTLE_MS = 3000;
 const DESKTOP_FINAL_SETTLE_MS = 2000;
-const VIDEO_IFRAME_SCROLL_TIMEOUT_MS = 5000;
 
 async function stabilizePage(page, isMobile = false) {
 	// Ensure fonts are ready
@@ -212,15 +216,16 @@ async function stabilizePage(page, isMobile = false) {
 	/* =====================================================
      Scroll to hydrate lazy content
      ===================================================== */
-	const scrollConfig = {
-		scrollStep: isMobile ? MOBILE_SCROLL_STEP_PX : DESKTOP_SCROLL_STEP_PX,
-		scrollDelay: isMobile ? MOBILE_SCROLL_DELAY_MS : DESKTOP_SCROLL_DELAY_MS,
-		scrollTopDelay: SCROLL_TOP_DELAY_MS,
-		scrollBottomDelay: SCROLL_BOTTOM_DELAY_MS,
-	};
-
 	await page.evaluate(
-		async ({ scrollStep, scrollDelay, scrollTopDelay, scrollBottomDelay }) => {
+		async ({
+			mobile,
+			mobileScrollStepPx,
+			desktopScrollStepPx,
+			mobileScrollDelayMs,
+			desktopScrollDelayMs,
+			scrollBottomSettleMs,
+			scrollTopSettleMs,
+		}) => {
 			const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 			const getScrollHeight = () => {
@@ -233,6 +238,8 @@ async function stabilizePage(page, isMobile = false) {
 			};
 
 			let height = getScrollHeight();
+			const scrollStep = mobile ? mobileScrollStepPx : desktopScrollStepPx;
+			const scrollDelay = mobile ? mobileScrollDelayMs : desktopScrollDelayMs;
 
 			// Scroll down
 			for (let y = 0; y <= height; y += scrollStep) {
@@ -246,7 +253,7 @@ async function stabilizePage(page, isMobile = false) {
 			}
 
 			window.scrollTo(0, height);
-			await delay(scrollTopDelay);
+			await delay(scrollBottomSettleMs);
 
 			// Scroll back up
 			for (let y = height; y >= 0; y -= scrollStep) {
@@ -255,15 +262,23 @@ async function stabilizePage(page, isMobile = false) {
 			}
 
 			window.scrollTo(0, 0);
-			await delay(scrollBottomDelay);
+			await delay(scrollTopSettleMs);
 		},
-		scrollConfig,
+		{
+			mobile: isMobile,
+			mobileScrollStepPx: MOBILE_SCROLL_STEP_PX,
+			desktopScrollStepPx: DESKTOP_SCROLL_STEP_PX,
+			mobileScrollDelayMs: MOBILE_SCROLL_DELAY_MS,
+			desktopScrollDelayMs: DESKTOP_SCROLL_DELAY_MS,
+			scrollBottomSettleMs: SCROLL_BOTTOM_SETTLE_MS,
+			scrollTopSettleMs: SCROLL_TOP_SETTLE_MS,
+		},
 	);
 
 	/* =====================================================
      Wait for images to load
      ===================================================== */
-	await page.evaluate(async (imageTimeout) => {
+	await page.evaluate(async (imageLoadTimeoutMs) => {
 		const images = Array.from(document.querySelectorAll("img"));
 		await Promise.all(
 			images.map((img) => {
@@ -271,7 +286,7 @@ async function stabilizePage(page, isMobile = false) {
 				return new Promise((resolve) => {
 					img.onload = resolve;
 					img.onerror = resolve;
-					setTimeout(resolve, imageTimeout);
+					setTimeout(resolve, imageLoadTimeoutMs);
 				});
 			}),
 		);

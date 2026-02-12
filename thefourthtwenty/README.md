@@ -56,7 +56,7 @@ across all configured devices.
 - `/category/retirement/` – Category: Retirement
 - `/category/other-stuff/` – Category: Other Stuff
 
-### C. Blog Posts (5 Endpoints)
+### C. Blog Posts (8 Endpoints)
 
 - `/of-life-and-death/` – Of Life And Death
 - `/welcome-to-my-existential-crisis/` – Welcome To My Existential Crisis
@@ -64,12 +64,14 @@ across all configured devices.
 - `/weekly-wtfs/` – Weekly WTFs
 - `/weekly-wtf/floor-crossers/` – Weekly WTF: Floor Crossers
 - `/welcome-home-baby/` – Welcome Home Baby
-- `/head-and-shoulder-knees-and-toes/` – Head, Shoulders, Knees and Toes
+- `/head-and-shoulder-knees-and-toes/` – Head And Shoulders Knees And Toes
 - `/weekly-wtf/parking/` – Weekly WTF: Parking
+
+---
 
 ## 5. Execution Option A: Cloud (GitHub Actions)
 
-**Schedule:** Every Tuesday at **9:00 AM IST** (**03:30 AM UTC**).
+**Trigger:** Manual (`workflow_dispatch`)
 
 1. Navigate to the **Actions** tab.
 2. Select **The Fourth Twenty: Automation**.
@@ -96,7 +98,7 @@ npx playwright install
 
 ### Step 2: Run Tests
 
-From the thefouthtwenty App folder:
+From the thefourthtwenty App folder:
 
 ```bash
 cd thefourthtwenty
