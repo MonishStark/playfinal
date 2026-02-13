@@ -118,7 +118,9 @@ async function stabilizePage(page) {
 					}
 				});
 
-			const imgs = Array.from(document.querySelectorAll("img"));
+			const imgs = Array.from(document.querySelectorAll("img")).filter(
+				(img) => img.clientWidth > 1 && img.clientHeight > 1,
+			);
 
 			await Promise.all(
 				imgs.map(async (img) => {
