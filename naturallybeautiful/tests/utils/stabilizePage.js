@@ -1,5 +1,8 @@
 /** @format */
 
+const SCROLL_PAUSE_MS = 50;
+const IMAGE_LOAD_TIMEOUT_MS = 5000;
+
 async function stabilizePage(page) {
 	// 1️⃣ Wait for fonts
 	await page.evaluate(() => document.fonts.ready);
@@ -68,7 +71,6 @@ async function stabilizePage(page) {
 	});
 
 	// 6️⃣ Deterministic scroll to force lazy content
-	const SCROLL_PAUSE_MS = 50;
 	await page.evaluate(async ({ scrollPauseMs }) => {
 		const step = window.innerHeight * 0.9;
 		let lastScrollY = -1;
@@ -84,7 +86,6 @@ async function stabilizePage(page) {
 	}, { scrollPauseMs: SCROLL_PAUSE_MS });
 
 	// 7️⃣ Best-effort wait for lazy images to load/decode before screenshot
-	const IMAGE_LOAD_TIMEOUT_MS = 5000;
 	try {
 		await page.evaluate(async ({ imageLoadTimeoutMs }) => {
 			const imgs = Array.from(document.querySelectorAll("img"));
