@@ -74,12 +74,15 @@ async function stabilizePage(page) {
 	await page.evaluate(async ({ scrollPauseMs }) => {
 		const step = window.innerHeight * 0.9;
 		let lastScrollY = -1;
+		let scrollCount = 0;
+		const maxScrolls = 30;
 
-		while (window.scrollY !== lastScrollY) {
+		while (window.scrollY !== lastScrollY && scrollCount < maxScrolls) {
 			lastScrollY = window.scrollY;
 			window.scrollBy(0, step);
 			await new Promise((r) => requestAnimationFrame(r));
 			await new Promise((r) => setTimeout(r, scrollPauseMs));
+			scrollCount++;
 		}
 
 		window.scrollTo(0, 0);
