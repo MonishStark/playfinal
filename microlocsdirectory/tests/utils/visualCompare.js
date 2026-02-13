@@ -43,7 +43,12 @@ async function getIgnoreRegions(page, selectors) {
 	return regions;
 }
 
-async function compareImages(current, baseline, ignoreRegions = [], options = {}) {
+async function compareImages(
+	current,
+	baseline,
+	ignoreRegions = [],
+	options = {},
+) {
 	const pmatch = await loadPixelmatch(); // Load pixelmatch dynamically
 	const threshold = options?.threshold ?? 0.1;
 
@@ -66,11 +71,7 @@ async function compareImages(current, baseline, ignoreRegions = [], options = {}
 
 		const rowLength = (rowEndX - rowStartX) * 4;
 
-		for (
-			let y = rowStartY;
-			y < rowEndY;
-			y++
-		) {
+		for (let y = rowStartY; y < rowEndY; y++) {
 			const rowStart = (y * width + rowStartX) * 4;
 			baselineData.copy(currentData, rowStart, rowStart, rowStart + rowLength);
 		}
@@ -105,8 +106,8 @@ async function compareWithIgnoredRegions(
 
 	const ignoreRegions = await getIgnoreRegions(page, ignoreSelectors);
 
-	const regenerateBaseline = (reasonMessage) => {
-		fs.writeFileSync(baselinePath, screenshotBuffer);
+	const regenerateBaseline = async (reasonMessage) => {
+		await fs.promises.writeFile(baselinePath, screenshotBuffer);
 		return {
 			pass: true,
 			isNewBaseline: true,
@@ -139,7 +140,7 @@ async function compareWithIgnoredRegions(
 		console.warn(
 			`[Baseline Corrupt] Baseline image at ${baselinePath} is corrupt. Regenerating...`,
 		);
-		return regenerateBaseline("was corrupt");
+		return await regenerateBaseline("was corrupt");
 	}
 
 	// If dimensions don't match, regenerate the baseline
@@ -147,7 +148,7 @@ async function compareWithIgnoredRegions(
 		console.warn(
 			`[Baseline Mismatch] Current: ${current.width}x${current.height}, Baseline: ${baseline.width}x${baseline.height} - Regenerating...`,
 		);
-		return regenerateBaseline(
+		return await regenerateBaseline(
 			`size changed from ${baseline.width}x${baseline.height} to ${current.width}x${current.height}`,
 		);
 	}
