@@ -130,7 +130,7 @@ async function stabilizePage(page) {
 					imgs.map(async (img) => {
 						await waitImageSettled(img, imageLoadTimeoutMs);
 
-						if (typeof img.decode === "function") {
+						if (img.naturalWidth > 0 && typeof img.decode === "function") {
 							await img.decode().catch(() => {});
 						}
 					}),
