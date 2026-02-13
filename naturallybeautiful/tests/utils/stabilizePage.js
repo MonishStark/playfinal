@@ -69,13 +69,14 @@ async function stabilizePage(page) {
 
 	// 6️⃣ Deterministic scroll to force lazy content
 	await page.evaluate(async () => {
+		const SCROLL_PAUSE_MS = 50;
 		const step = window.innerHeight * 0.9;
 		const total = document.body.scrollHeight;
 
 		for (let y = 0; y <= total; y += step) {
 			window.scrollTo(0, y);
 			await new Promise((r) => requestAnimationFrame(r));
-			await new Promise((r) => setTimeout(r, 50));
+			await new Promise((r) => setTimeout(r, SCROLL_PAUSE_MS));
 		}
 
 		window.scrollTo(0, 0);
