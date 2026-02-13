@@ -71,69 +71,78 @@ async function stabilizePage(page) {
 	});
 
 	// 6️⃣ Deterministic scroll to force lazy content
-	await page.evaluate(async ({ scrollPauseMs }) => {
-		const step = window.innerHeight * 0.9;
-		let lastScrollY = -1;
-		let scrollCount = 0;
-		const maxScrolls = 30;
+	await page.evaluate(
+		async ({ scrollPauseMs }) => {
+			const step = window.innerHeight * 0.9;
+			let lastScrollY = -1;
+			let scrollCount = 0;
+			const maxScrolls = 30;
 
-		while (window.scrollY !== lastScrollY && scrollCount < maxScrolls) {
-			lastScrollY = window.scrollY;
-			window.scrollBy(0, step);
-			await new Promise((r) => requestAnimationFrame(r));
-			await new Promise((r) => setTimeout(r, scrollPauseMs));
-			scrollCount++;
-		}
+			while (window.scrollY !== lastScrollY && scrollCount < maxScrolls) {
+				lastScrollY = window.scrollY;
+				window.scrollBy(0, step);
+				await new Promise((r) => requestAnimationFrame(r));
+				await new Promise((r) => setTimeout(r, scrollPauseMs));
+				scrollCount++;
+			}
 
-		window.scrollTo(0, 0);
-	}, { scrollPauseMs: SCROLL_PAUSE_MS });
+			window.scrollTo(0, 0);
+		},
+		{ scrollPauseMs: SCROLL_PAUSE_MS },
+	);
 
 	// 7️⃣ Best-effort wait for lazy images to load/decode before screenshot
 	try {
-		await page.evaluate(async ({ imageLoadTimeoutMs }) => {
-			const waitImageSettled = (img, timeoutMs) =>
-				new Promise((resolve) => {
-					if (img.complete) {
-						resolve();
-						return;
-					}
+		await page.evaluate(
+			async ({ imageLoadTimeoutMs }) => {
+				const waitImageSettled = (img, timeoutMs) =>
+					new Promise((resolve) => {
+						if (img.complete) {
+							resolve();
+							return;
+						}
 
-					let resolved = false;
-					const done = () => {
-						if (resolved) return;
-						resolved = true;
-						clearTimeout(timeoutId);
-						img.removeEventListener("load", done);
-						img.removeEventListener("error", done);
-						resolve();
-					};
+						let resolved = false;
+						const done = () => {
+							if (resolved) return;
+							resolved = true;
+							clearTimeout(timeoutId);
+							img.removeEventListener("load", done);
+							img.removeEventListener("error", done);
+							resolve();
+						};
 
-					const timeoutId = setTimeout(done, timeoutMs);
-					img.addEventListener("load", done, { once: true });
-					img.addEventListener("error", done, { once: true });
+						const timeoutId = setTimeout(done, timeoutMs);
+						img.addEventListener("load", done, { once: true });
+						img.addEventListener("error", done, { once: true });
 
-					// Handle race where image completes between outer check and listener attachment.
-					if (img.complete) {
-						done();
-					}
-				});
+						// Handle race where image completes between outer check and listener attachment.
+						if (img.complete) {
+							done();
+						}
+					});
 
-			const imgs = Array.from(document.querySelectorAll("img")).filter(
-				(img) => img.clientWidth > 1 && img.clientHeight > 1,
-			);
+				const imgs = Array.from(document.querySelectorAll("img")).filter(
+					(img) => img.clientWidth > 1 && img.clientHeight > 1,
+				);
 
-			await Promise.all(
-				imgs.map(async (img) => {
-					await waitImageSettled(img, imageLoadTimeoutMs);
+				await Promise.all(
+					imgs.map(async (img) => {
+						await waitImageSettled(img, imageLoadTimeoutMs);
 
-					if (typeof img.decode === "function") {
-						await img.decode().catch(() => {});
-					}
-				}),
-			);
-		}, { imageLoadTimeoutMs: IMAGE_LOAD_TIMEOUT_MS });
+						if (typeof img.decode === "function") {
+							await img.decode().catch(() => {});
+						}
+					}),
+				);
+			},
+			{ imageLoadTimeoutMs: IMAGE_LOAD_TIMEOUT_MS },
+		);
 	} catch (error) {
-		console.warn("stabilizePage: lazy-image stabilization failed (non-fatal)", error);
+		console.warn(
+			"stabilizePage: lazy-image stabilization failed (non-fatal)",
+			error,
+		);
 	}
 }
 
