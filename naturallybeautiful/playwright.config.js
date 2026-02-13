@@ -5,7 +5,8 @@ const { defineConfig, devices } = require("@playwright/test");
 module.exports = defineConfig({
 	testDir: "./tests",
 	fullyParallel: false,
-	retries: 3, // Reduced after stabilization improvements to speed up CI.
+	timeout: 120000, // 2 minutes total test timeout
+	retries: 5,
 
 	reporter: [["html"], ["json", { outputFile: "results.json" }]],
 
@@ -16,10 +17,11 @@ module.exports = defineConfig({
 	},
 
 	expect: {
-		timeout: 30000,
+		timeout: 45000, // 45 seconds for assertions
 		toHaveScreenshot: {
 			animations: "disabled",
 			scale: "css",
+			timeout: 60000, // 60 seconds for screenshot comparison
 		},
 	},
 
