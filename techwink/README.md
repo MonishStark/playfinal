@@ -128,7 +128,7 @@ across all configured devices.
 
 - `/press/vendorland/` – Vendorland
 
-### H. Blog Articles (5 Endpoints)
+### H. Blog Articles (76 Endpoints)
 
 - `/blog/google-antigravity-your-path-to-a-billion-dollar-company/` – Google Antigravity
 - `/blog/software-development-cost-estimation-2026/` – Software Development Cost Estimation 2026
