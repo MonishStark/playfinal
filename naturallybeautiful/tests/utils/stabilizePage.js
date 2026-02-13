@@ -1,7 +1,7 @@
 /** @format */
 
 const SCROLL_PAUSE_MS = 50;
-const IMAGE_LOAD_TIMEOUT_MS = 5000;
+const IMAGE_LOAD_TIMEOUT_MS = 8000;
 
 async function stabilizePage(page) {
 	// 1️⃣ Wait for fonts
