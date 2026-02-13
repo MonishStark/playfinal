@@ -88,33 +88,38 @@ async function stabilizePage(page) {
 	// 7️⃣ Best-effort wait for lazy images to load/decode before screenshot
 	try {
 		await page.evaluate(async ({ imageLoadTimeoutMs }) => {
+			const waitImageSettled = (img, timeoutMs) =>
+				new Promise((resolve) => {
+					if (img.complete) {
+						resolve();
+						return;
+					}
+
+					let resolved = false;
+					const done = () => {
+						if (resolved) return;
+						resolved = true;
+						clearTimeout(timeoutId);
+						img.removeEventListener("load", done);
+						img.removeEventListener("error", done);
+						resolve();
+					};
+
+					const timeoutId = setTimeout(done, timeoutMs);
+					img.addEventListener("load", done, { once: true });
+					img.addEventListener("error", done, { once: true });
+
+					// Handle race where image completes between outer check and listener attachment.
+					if (img.complete) {
+						done();
+					}
+				});
+
 			const imgs = Array.from(document.querySelectorAll("img"));
 
 			await Promise.all(
 				imgs.map(async (img) => {
-					if (!img.complete) {
-						await new Promise((resolve) => {
-							let resolved = false;
-							const done = () => {
-								if (resolved) return;
-								resolved = true;
-								clearTimeout(timeoutId);
-								img.removeEventListener("load", done);
-								img.removeEventListener("error", done);
-								resolve();
-							};
-
-							const timeoutId = setTimeout(done, imageLoadTimeoutMs);
-
-							img.addEventListener("load", done, { once: true });
-							img.addEventListener("error", done, { once: true });
-
-							// Handle race where image completes between outer check and listener attachment.
-							if (img.complete) {
-								done();
-							}
-						});
-					}
+					await waitImageSettled(img, imageLoadTimeoutMs);
 
 					if (typeof img.decode === "function") {
 						await img.decode().catch(() => {});
