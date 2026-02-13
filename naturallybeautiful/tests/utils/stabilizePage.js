@@ -82,6 +82,41 @@ async function stabilizePage(page) {
 
 		window.scrollTo(0, 0);
 	}, { scrollPauseMs: SCROLL_PAUSE_MS });
+
+	// 7️⃣ Best-effort wait for lazy images to load/decode before screenshot
+	const IMAGE_LOAD_TIMEOUT_MS = 5000;
+	try {
+		await page.evaluate(async ({ imageLoadTimeoutMs }) => {
+			const imgs = Array.from(document.querySelectorAll("img"));
+
+			await Promise.all(
+				imgs.map(async (img) => {
+					if (!img.complete) {
+						await new Promise((resolve) => {
+							let resolved = false;
+							const done = () => {
+								if (resolved) return;
+								resolved = true;
+								img.removeEventListener("load", done);
+								img.removeEventListener("error", done);
+								resolve();
+							};
+
+							img.addEventListener("load", done, { once: true });
+							img.addEventListener("error", done, { once: true });
+							setTimeout(done, imageLoadTimeoutMs);
+						});
+					}
+
+					if (typeof img.decode === "function") {
+						await img.decode().catch(() => {});
+					}
+				}),
+			);
+		}, { imageLoadTimeoutMs: IMAGE_LOAD_TIMEOUT_MS });
+	} catch (error) {
+		console.warn("stabilizePage: lazy-image stabilization failed (non-fatal)", error);
+	}
 }
 
 module.exports = stabilizePage;
