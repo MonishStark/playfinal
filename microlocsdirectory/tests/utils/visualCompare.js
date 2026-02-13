@@ -105,6 +105,16 @@ async function compareWithIgnoredRegions(
 
 	const ignoreRegions = await getIgnoreRegions(page, ignoreSelectors);
 
+	const regenerateBaseline = (reasonMessage) => {
+		fs.writeFileSync(baselinePath, screenshotBuffer);
+		return {
+			pass: true,
+			isNewBaseline: true,
+			message: `✅ Baseline regenerated (${reasonMessage})`,
+			ignoredRegions: ignoreRegions.length,
+		};
+	};
+
 	// Create baseline if it doesn't exist
 	if (!fs.existsSync(baselinePath)) {
 		const dir = path.dirname(baselinePath);
@@ -129,13 +139,7 @@ async function compareWithIgnoredRegions(
 		console.warn(
 			`[Baseline Corrupt] Baseline image at ${baselinePath} is corrupt. Regenerating...`,
 		);
-		fs.writeFileSync(baselinePath, screenshotBuffer);
-		return {
-			pass: true,
-			isNewBaseline: true,
-			message: "✅ Baseline regenerated (was corrupt)",
-			ignoredRegions: ignoreRegions.length,
-		};
+		return regenerateBaseline("was corrupt");
 	}
 
 	// If dimensions don't match, regenerate the baseline
@@ -143,13 +147,9 @@ async function compareWithIgnoredRegions(
 		console.warn(
 			`[Baseline Mismatch] Current: ${current.width}x${current.height}, Baseline: ${baseline.width}x${baseline.height} - Regenerating...`,
 		);
-		fs.writeFileSync(baselinePath, screenshotBuffer);
-		return {
-			pass: true,
-			isNewBaseline: true,
-			message: `✅ Baseline regenerated (size changed from ${baseline.width}x${baseline.height} to ${current.width}x${current.height})`,
-			ignoredRegions: ignoreRegions.length,
-		};
+		return regenerateBaseline(
+			`size changed from ${baseline.width}x${baseline.height} to ${current.width}x${current.height}`,
+		);
 	}
 
 	const result = await compareImages(current, baseline, ignoreRegions, {
