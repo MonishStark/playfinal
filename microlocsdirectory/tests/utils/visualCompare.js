@@ -43,13 +43,15 @@ async function getIgnoreRegions(page, selectors) {
 	return regions;
 }
 
-async function compareImages(current, baseline, ignoreRegions = []) {
+async function compareImages(current, baseline, ignoreRegions = [], options = {}) {
 	const pmatch = await loadPixelmatch(); // Load pixelmatch dynamically
+	const threshold = options?.threshold ?? 0.1;
 
 	const { width, height } = baseline;
 	const diff = new PNG({ width, height });
 
 	const baselineData = baseline.data;
+	// Intentionally mutate this local parsed image buffer for performance.
 	const currentData = current.data;
 
 	// Make ignored regions identical by copying baseline pixels into current image
@@ -81,7 +83,7 @@ async function compareImages(current, baseline, ignoreRegions = []) {
 		width,
 		height,
 		{
-			threshold: 0.1,
+			threshold,
 		},
 	);
 
@@ -99,7 +101,7 @@ async function compareWithIgnoredRegions(
 	ignoreSelectors = [],
 	options = {},
 ) {
-	const { maxDiffPixelRatio = 0.03 } = options;
+	const { maxDiffPixelRatio = 0.03, pixelmatchThreshold = 0.1 } = options;
 
 	const ignoreRegions = await getIgnoreRegions(page, ignoreSelectors);
 
@@ -136,7 +138,9 @@ async function compareWithIgnoredRegions(
 		};
 	}
 
-	const result = await compareImages(current, baseline, ignoreRegions);
+	const result = await compareImages(current, baseline, ignoreRegions, {
+		threshold: pixelmatchThreshold,
+	});
 
 	const pass = result.diffPercent <= maxDiffPixelRatio;
 
