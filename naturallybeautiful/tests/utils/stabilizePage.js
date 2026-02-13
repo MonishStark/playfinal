@@ -97,14 +97,21 @@ async function stabilizePage(page) {
 							const done = () => {
 								if (resolved) return;
 								resolved = true;
+								clearTimeout(timeoutId);
 								img.removeEventListener("load", done);
 								img.removeEventListener("error", done);
 								resolve();
 							};
 
+							const timeoutId = setTimeout(done, imageLoadTimeoutMs);
+
 							img.addEventListener("load", done, { once: true });
 							img.addEventListener("error", done, { once: true });
-							setTimeout(done, imageLoadTimeoutMs);
+
+							// Handle race where image completes between outer check and listener attachment.
+							if (img.complete) {
+								done();
+							}
 						});
 					}
 
