@@ -50,7 +50,7 @@ async function compareImages(current, baseline, ignoreRegions = []) {
 	const diff = new PNG({ width, height });
 
 	const baselineData = baseline.data;
-	const currentData = Buffer.from(current.data);
+	const currentData = current.data;
 
 	// Make ignored regions identical by copying baseline pixels into current image
 	for (const region of ignoreRegions) {
