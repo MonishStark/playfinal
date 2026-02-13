@@ -58,17 +58,18 @@ async function compareImages(current, baseline, ignoreRegions = []) {
 		const rowEndY = Math.min(region.y + region.height, height);
 		if (rowEndY <= rowStartY) continue;
 
+		const rowStartX = Math.max(0, region.x);
+		const rowEndX = Math.min(region.x + region.width, width);
+		if (rowEndX <= rowStartX) continue;
+
+		const rowLength = (rowEndX - rowStartX) * 4;
+
 		for (
 			let y = rowStartY;
 			y < rowEndY;
 			y++
 		) {
-			const rowStartX = Math.max(0, region.x);
-			const rowEndX = Math.min(region.x + region.width, width);
-			if (rowEndX <= rowStartX) continue;
-
 			const rowStart = (y * width + rowStartX) * 4;
-			const rowLength = (rowEndX - rowStartX) * 4;
 			baselineData.copy(currentData, rowStart, rowStart, rowStart + rowLength);
 		}
 	}
