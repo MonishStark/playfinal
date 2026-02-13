@@ -47,34 +47,33 @@ async function compareImages(
 	current,
 	baseline,
 	ignoreRegions = [],
-	threshold = 0.1,
+	options = {},
 ) {
 	const pmatch = await loadPixelmatch(); // Load pixelmatch dynamically
+	const threshold = options?.threshold ?? 0.1;
 
 	const { width, height } = baseline;
 	const diff = new PNG({ width, height });
 
 	const baselineData = baseline.data;
+	// Intentionally mutate this local parsed image buffer for performance.
 	const currentData = current.data;
 
-	// Make ignored regions identical in both images
+	// Make ignored regions identical by copying baseline pixels into current image
 	for (const region of ignoreRegions) {
-		for (
-			let y = region.y;
-			y < Math.min(region.y + region.height, height);
-			y++
-		) {
-			for (
-				let x = region.x;
-				x < Math.min(region.x + region.width, width);
-				x++
-			) {
-				const idx = (y * width + x) * 4;
-				baselineData[idx] = currentData[idx] = 128;
-				baselineData[idx + 1] = currentData[idx + 1] = 128;
-				baselineData[idx + 2] = currentData[idx + 2] = 128;
-				baselineData[idx + 3] = currentData[idx + 3] = 255;
-			}
+		const rowStartY = Math.max(0, region.y);
+		const rowEndY = Math.min(region.y + region.height, height);
+		if (rowEndY <= rowStartY) continue;
+
+		const rowStartX = Math.max(0, region.x);
+		const rowEndX = Math.min(region.x + region.width, width);
+		if (rowEndX <= rowStartX) continue;
+
+		const rowLength = (rowEndX - rowStartX) * 4;
+
+		for (let y = rowStartY; y < rowEndY; y++) {
+			const rowStart = (y * width + rowStartX) * 4;
+			baselineData.copy(currentData, rowStart, rowStart, rowStart + rowLength);
 		}
 	}
 
@@ -103,9 +102,19 @@ async function compareWithIgnoredRegions(
 	ignoreSelectors = [],
 	options = {},
 ) {
-	const { maxDiffPixelRatio = 0.03 } = options;
+	const { maxDiffPixelRatio = 0.03, pixelmatchThreshold = 0.1 } = options;
 
 	const ignoreRegions = await getIgnoreRegions(page, ignoreSelectors);
+
+	const regenerateBaseline = async (reasonMessage) => {
+		await fs.promises.writeFile(baselinePath, screenshotBuffer);
+		return {
+			pass: true,
+			isNewBaseline: true,
+			message: `✅ Baseline regenerated (${reasonMessage})`,
+			ignoredRegions: ignoreRegions.length,
+		};
+	};
 
 	// Create baseline if it doesn't exist
 	if (!fs.existsSync(baselinePath)) {
@@ -122,25 +131,31 @@ async function compareWithIgnoredRegions(
 
 	const baselineBuffer = fs.readFileSync(baselinePath);
 
-	// Check dimensions first - if they don't match, update baseline
+	// Check dimensions before comparing
 	const current = PNG.sync.read(screenshotBuffer);
-	const baseline = PNG.sync.read(baselineBuffer);
-
-	if (current.width !== baseline.width || current.height !== baseline.height) {
-		console.info(
-			`[Dimension Mismatch] Baseline: ${baseline.width}x${baseline.height}, Current: ${current.width}x${current.height}`,
+	let baseline;
+	try {
+		baseline = PNG.sync.read(baselineBuffer);
+	} catch (error) {
+		console.warn(
+			`[Baseline Corrupt] Baseline image at ${baselinePath} is corrupt. Regenerating...`,
 		);
-		console.info(`[Update] Writing new baseline with current dimensions...`);
-		fs.writeFileSync(baselinePath, screenshotBuffer);
-		return {
-			pass: true,
-			isNewBaseline: true,
-			message: `✅ Baseline updated (dimension changed from ${baseline.width}x${baseline.height} to ${current.width}x${current.height})`,
-			ignoredRegions: ignoreRegions.length,
-		};
+		return await regenerateBaseline("was corrupt");
 	}
 
-	const result = await compareImages(current, baseline, ignoreRegions);
+	// If dimensions don't match, regenerate the baseline
+	if (current.width !== baseline.width || current.height !== baseline.height) {
+		console.warn(
+			`[Baseline Mismatch] Current: ${current.width}x${current.height}, Baseline: ${baseline.width}x${baseline.height} - Regenerating...`,
+		);
+		return await regenerateBaseline(
+			`size changed from ${baseline.width}x${baseline.height} to ${current.width}x${current.height}`,
+		);
+	}
+
+	const result = await compareImages(current, baseline, ignoreRegions, {
+		threshold: pixelmatchThreshold,
+	});
 
 	const pass = result.diffPercent <= maxDiffPixelRatio;
 
