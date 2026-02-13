@@ -33,9 +33,9 @@ async function stabilizePage(page) {
 			'div[id*="modal"]',
 		];
 
-		selectors.forEach((sel) =>
-			document.querySelectorAll(sel).forEach((el) => el.remove())
-		);
+		selectors.forEach((sel) => {
+			document.querySelectorAll(sel).forEach((el) => el.remove());
+		});
 
 		document.body.style.overflow = "visible";
 	});
