@@ -75,6 +75,7 @@ async function stabilizePage(page) {
 		for (let y = 0; y <= total; y += step) {
 			window.scrollTo(0, y);
 			await new Promise((r) => requestAnimationFrame(r));
+			await new Promise((r) => setTimeout(r, 50));
 		}
 
 		window.scrollTo(0, 0);
