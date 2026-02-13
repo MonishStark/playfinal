@@ -71,10 +71,11 @@ async function stabilizePage(page) {
 	await page.evaluate(async () => {
 		const SCROLL_PAUSE_MS = 50;
 		const step = window.innerHeight * 0.9;
-		const total = document.body.scrollHeight;
+		let lastScrollY = -1;
 
-		for (let y = 0; y <= total; y += step) {
-			window.scrollTo(0, y);
+		while (window.scrollY !== lastScrollY) {
+			lastScrollY = window.scrollY;
+			window.scrollBy(0, step);
 			await new Promise((r) => requestAnimationFrame(r));
 			await new Promise((r) => setTimeout(r, SCROLL_PAUSE_MS));
 		}
