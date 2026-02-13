@@ -21,7 +21,6 @@ module.exports = defineConfig({
 		toHaveScreenshot: {
 			animations: "disabled",
 			scale: "css",
-			timeout: 60000, // 60 seconds for screenshot comparison
 		},
 	},
 
