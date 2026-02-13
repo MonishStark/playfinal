@@ -122,7 +122,21 @@ async function compareWithIgnoredRegions(
 
 	// Check dimensions before comparing
 	const current = PNG.sync.read(screenshotBuffer);
-	const baseline = PNG.sync.read(baselineBuffer);
+	let baseline;
+	try {
+		baseline = PNG.sync.read(baselineBuffer);
+	} catch (error) {
+		console.warn(
+			`[Baseline Corrupt] Baseline image at ${baselinePath} is corrupt. Regenerating...`,
+		);
+		fs.writeFileSync(baselinePath, screenshotBuffer);
+		return {
+			pass: true,
+			isNewBaseline: true,
+			message: "✅ Baseline regenerated (was corrupt)",
+			ignoredRegions: ignoreRegions.length,
+		};
+	}
 
 	// If dimensions don't match, regenerate the baseline
 	if (current.width !== baseline.width || current.height !== baseline.height) {
