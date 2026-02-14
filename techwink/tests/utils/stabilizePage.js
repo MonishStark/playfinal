@@ -107,6 +107,38 @@ function warnNonFatal(context, error) {
 	console.warn(`[stabilizePage] ${context}: ${message}`);
 }
 
+async function retryOnNavigation(page, context, action, maxAttempts = 2) {
+	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+		try {
+			await action();
+			return;
+		} catch (e) {
+			const message = String(e?.message || "");
+			const shouldRetryAfterNavigation =
+				attempt < maxAttempts - 1 &&
+				message.includes("Execution context was destroyed");
+
+			warnNonFatal(
+				shouldRetryAfterNavigation
+					? `${context} (retrying after navigation)`
+					: context,
+				e,
+			);
+
+			if (!shouldRetryAfterNavigation) {
+				return;
+			}
+
+			await page
+				.waitForLoadState("domcontentloaded", {
+					timeout: FONTS_READY_TIMEOUT_MS,
+				})
+				.catch(() => {});
+			await page.waitForTimeout(200);
+		}
+	}
+}
+
 function hydrateLazyImageElement(
 	img,
 	{ lazyAttrCandidates, lazySrcsetAttrCandidates },
@@ -341,9 +373,8 @@ async function stabilizePartnersPage(page) {
 }
 
 async function stabilizeCareersPage(page) {
-	for (let attempt = 0; attempt < 2; attempt++) {
-		try {
-			await page.addStyleTag({
+	await retryOnNavigation(page, "careers stabilization", async () => {
+		await page.addStyleTag({
 			content: `
           /* Force all career blocks/text/cards to final rendered state */
           .elementor-section,
@@ -373,59 +404,31 @@ async function stabilizeCareersPage(page) {
             filter: none !important;
           }
         `,
-			});
-			await page.evaluate(forceElementsVisible, {
-				selector: VISIBILITY_FIX_SELECTOR,
-				opacityThreshold: FORCE_VISIBLE_OPACITY_THRESHOLD,
-				animationMarkerSelector: ANIMATION_MARKER_SELECTOR,
-			});
+		});
+		await page.evaluate(forceElementsVisible, {
+			selector: VISIBILITY_FIX_SELECTOR,
+			opacityThreshold: FORCE_VISIBLE_OPACITY_THRESHOLD,
+			animationMarkerSelector: ANIMATION_MARKER_SELECTOR,
+		});
 
-			await page.evaluate(
-				async ({ anchors, careersAnchorWarmupDelayMs }) => {
-					const delay = (ms) =>
-						new Promise((resolve) => setTimeout(resolve, ms));
+		await page.evaluate(
+			async ({ anchors, careersAnchorWarmupDelayMs }) => {
+				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-					// Warm up the sections that are often animation-triggered on this page.
-					for (const node of Array.from(
-						document.querySelectorAll(anchors.join(",")),
-					)) {
-						node.scrollIntoView({ behavior: "instant", block: "center" });
-						await delay(careersAnchorWarmupDelayMs);
-					}
+				// Warm up the sections that are often animation-triggered on this page.
+				for (const node of Array.from(document.querySelectorAll(anchors.join(",")))) {
+					node.scrollIntoView({ behavior: "instant", block: "center" });
+					await delay(careersAnchorWarmupDelayMs);
+				}
 
-					window.scrollTo(0, 0);
-				},
-				{
-					anchors: CAREERS_WARMUP_ANCHORS,
-					careersAnchorWarmupDelayMs: CAREERS_ANCHOR_WARMUP_DELAY_MS,
-				},
-			);
-
-			break;
-		} catch (e) {
-			const message = String(e?.message || "");
-			const shouldRetryAfterNavigation =
-				attempt === 0 && message.includes("Execution context was destroyed");
-
-			warnNonFatal(
-				shouldRetryAfterNavigation
-					? "careers stabilization (retrying after navigation)"
-					: "careers stabilization",
-				e,
-			);
-
-			if (!shouldRetryAfterNavigation) {
-				break;
-			}
-
-			await page
-				.waitForLoadState("domcontentloaded", {
-					timeout: FONTS_READY_TIMEOUT_MS,
-				})
-				.catch(() => {});
-			await page.waitForTimeout(200);
-		}
-	}
+				window.scrollTo(0, 0);
+			},
+			{
+				anchors: CAREERS_WARMUP_ANCHORS,
+				careersAnchorWarmupDelayMs: CAREERS_ANCHOR_WARMUP_DELAY_MS,
+			},
+		);
+	});
 }
 
 async function stabilizePage(page, path = "") {
@@ -501,8 +504,7 @@ async function stabilizePage(page, path = "") {
 
 	// 4.3️⃣ Deep hydration pass for high-scroll / lazy-heavy pages.
 	if (needsDeepHydration) {
-		for (let attempt = 0; attempt < 2; attempt++) {
-			try {
+		await retryOnNavigation(page, "deep hydration block", async () => {
 			await page.addStyleTag({
 				content: `
           /* Keep delayed/animated blocks in final state for full-page captures */
@@ -555,9 +557,7 @@ async function stabilizePage(page, path = "") {
 				};
 
 				const warmIframes = () => {
-					for (const iframe of Array.from(
-						document.querySelectorAll("iframe"),
-					)) {
+					for (const iframe of Array.from(document.querySelectorAll("iframe"))) {
 						iframe.setAttribute("loading", "eager");
 					}
 				};
@@ -627,16 +627,14 @@ async function stabilizePage(page, path = "") {
 					},
 					{ timeout: 15000 },
 				)
-				.catch((e) =>
-					warnNonFatal("deep hydration element visibility check", e),
-				);
+				.catch((e) => warnNonFatal("deep hydration element visibility check", e));
 
 			await page
 				.waitForFunction(
 					() => {
-						const visibleImgs = Array.from(
-							document.querySelectorAll("img"),
-						).filter((img) => img.clientWidth > 1 && img.clientHeight > 1);
+						const visibleImgs = Array.from(document.querySelectorAll("img")).filter(
+							(img) => img.clientWidth > 1 && img.clientHeight > 1,
+						);
 						if (visibleImgs.length === 0) return true;
 						return visibleImgs.every((img) => img.complete);
 					},
@@ -658,33 +656,7 @@ async function stabilizePage(page, path = "") {
 					? EXTRA_DEEP_HYDRATION_POST_WAIT_MS
 					: DEEP_HYDRATION_POST_WAIT_MS,
 			);
-
-				break;
-			} catch (e) {
-				const message = String(e?.message || "");
-				const shouldRetryAfterNavigation =
-					attempt === 0 &&
-					message.includes("Execution context was destroyed");
-
-				warnNonFatal(
-					shouldRetryAfterNavigation
-						? "deep hydration block (retrying after navigation)"
-						: "deep hydration block",
-					e,
-				);
-
-				if (!shouldRetryAfterNavigation) {
-					break;
-				}
-
-				await page
-					.waitForLoadState("domcontentloaded", {
-						timeout: FONTS_READY_TIMEOUT_MS,
-					})
-					.catch(() => {});
-				await page.waitForTimeout(200);
-			}
-		}
+		});
 	}
 
 	// 5️⃣ Initial settle
@@ -817,12 +789,23 @@ async function stabilizePage(page, path = "") {
 	// 🔟 Freeze height (stitch-safe)
 	try {
 		await page.evaluate(() => {
-			const h = document.documentElement.scrollHeight;
-			document.documentElement.style.height = h + "px";
-			document.body.style.height = h + "px";
+			const doc = document.documentElement;
+			const body = document.body;
+			const finalHeight = Math.max(
+				body?.scrollHeight || 0,
+				doc?.scrollHeight || 0,
+				body?.offsetHeight || 0,
+				doc?.offsetHeight || 0,
+				window.innerHeight || 0,
+			);
+
+			if (finalHeight > 0) {
+				doc.style.setProperty("min-height", `${finalHeight}px`, "important");
+				body.style.setProperty("min-height", `${finalHeight}px`, "important");
+			}
 		});
 	} catch (e) {
-		warnNonFatal("freeze document height", e);
+		warnNonFatal("freeze height", e);
 	}
 }
 
