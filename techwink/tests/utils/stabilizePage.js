@@ -94,22 +94,18 @@ function hydrateLazyImageElement(
 
 	if (img.loading === "lazy") img.loading = "eager";
 
-	if (!img.getAttribute("src")) {
-		const lazySrc = lazyAttrCandidates
-			.map((attr) => String(img.getAttribute(attr) || "").trim())
-			.find(Boolean);
-		if (lazySrc) {
-			img.setAttribute("src", lazySrc);
-		}
+	const lazySrc = lazyAttrCandidates
+		.map((attr) => String(img.getAttribute(attr) || "").trim())
+		.find(Boolean);
+	if (lazySrc && img.getAttribute("src") !== lazySrc) {
+		img.setAttribute("src", lazySrc);
 	}
 
-	if (!img.getAttribute("srcset")) {
-		const lazySrcset = lazySrcsetAttrCandidates
-			.map((attr) => String(img.getAttribute(attr) || "").trim())
-			.find(Boolean);
-		if (lazySrcset) {
-			img.setAttribute("srcset", lazySrcset);
-		}
+	const lazySrcset = lazySrcsetAttrCandidates
+		.map((attr) => String(img.getAttribute(attr) || "").trim())
+		.find(Boolean);
+	if (lazySrcset && img.getAttribute("srcset") !== lazySrcset) {
+		img.setAttribute("srcset", lazySrcset);
 	}
 }
 
@@ -356,11 +352,9 @@ async function stabilizeCareersPage(page) {
 				}
 
 				// Warm up the sections that are often animation-triggered on this page.
-				for (const selector of anchors) {
-					for (const node of Array.from(document.querySelectorAll(selector))) {
-						node.scrollIntoView({ behavior: "instant", block: "center" });
-						await delay(careersAnchorWarmupDelayMs);
-					}
+				for (const node of Array.from(document.querySelectorAll(anchors.join(",")))) {
+					node.scrollIntoView({ behavior: "instant", block: "center" });
+					await delay(careersAnchorWarmupDelayMs);
 				}
 
 				window.scrollTo(0, 0);
