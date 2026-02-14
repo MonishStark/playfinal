@@ -84,6 +84,59 @@ async function stabilizePage(page, path = "") {
 		});
 	} catch {}
 
+	// 3.1️⃣ Ensure header dropdown/mega-menu overlays are never captured.
+	try {
+		await page.addStyleTag({
+			content: `
+        header .sub-menu,
+        header .mega-menu,
+        header .mega-sub-menu,
+        header .elementor-nav-menu--dropdown,
+        header .elementor-nav-menu__container,
+        .elementor-location-header .sub-menu,
+        .elementor-location-header .mega-menu,
+        .elementor-location-header .mega-sub-menu,
+        .elementor-location-header .elementor-nav-menu--dropdown,
+        .main-header .sub-menu,
+        .main-header .mega-menu,
+        .main-header .mega-sub-menu,
+        .main-header .elementor-nav-menu--dropdown,
+        nav .sub-menu,
+        nav .mega-menu,
+        nav .mega-sub-menu {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+          transform: none !important;
+          max-height: 0 !important;
+          overflow: hidden !important;
+        }
+      `,
+		});
+
+		await page.evaluate(() => {
+			document
+				.querySelectorAll(
+					'header [aria-expanded="true"], nav [aria-expanded="true"], .elementor-location-header [aria-expanded="true"]',
+				)
+				.forEach((el) => el.setAttribute("aria-expanded", "false"));
+
+			document
+				.querySelectorAll(
+					"header .current-menu-ancestor, header .current_page_ancestor, header .open, header .show, nav .open, nav .show",
+				)
+				.forEach((el) => {
+					el.classList.remove(
+						"open",
+						"show",
+						"current-menu-ancestor",
+						"current_page_ancestor",
+					);
+				});
+		});
+	} catch {}
+
 	// 4️⃣ Force eager images (safe per-image)
 	const images = page.locator("img");
 	const count = await images.count();
