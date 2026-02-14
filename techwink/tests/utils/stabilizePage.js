@@ -151,7 +151,7 @@ function hydrateLazyImageElement(
 
 	const setLazyAttribute = (targetAttr, sourceAttrs) => {
 		const lazyValue = sourceAttrs
-			.map((attr) => String(img.getAttribute(attr) || "").trim())
+			.map((attr) => (img.getAttribute(attr) || "").trim())
 			.find(Boolean);
 		if (lazyValue && img.getAttribute(targetAttr) !== lazyValue) {
 			img.setAttribute(targetAttr, lazyValue);
@@ -337,7 +337,7 @@ async function stabilizePartnersPage(page) {
 					const alt = (img.getAttribute("alt") || "").toLowerCase();
 					const src = (img.getAttribute("src") || "").toLowerCase();
 					const lazyAttrText = lazyAttrCandidates
-						.map((attr) => String(img.getAttribute(attr) || ""))
+						.map((attr) => img.getAttribute(attr) || "")
 						.join(" ")
 						.toLowerCase();
 
