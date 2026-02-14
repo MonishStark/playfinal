@@ -167,48 +167,48 @@ async function collapseHeaderDropdowns(page) {
 				headerMenuMinWidthPx,
 				headerMenuMinHeightPx,
 			}) => {
-			const maybeMenuPanels = Array.from(
-				document.querySelectorAll(headerMenuPanelSelector),
-			);
+				const maybeMenuPanels = Array.from(
+					document.querySelectorAll(headerMenuPanelSelector),
+				);
 
-			for (const panel of maybeMenuPanels) {
-				const rect = panel.getBoundingClientRect();
-				const nearTop = rect.top <= headerMenuMaxTopPx;
-				const sizeable =
-					rect.width >= headerMenuMinWidthPx ||
-					rect.height >= headerMenuMinHeightPx;
-				const hasMenuRole =
-					panel.matches('[role="menu"], [role="menubar"]') ||
-					panel.querySelector('[role="menuitem"], a, button');
+				for (const panel of maybeMenuPanels) {
+					const rect = panel.getBoundingClientRect();
+					const nearTop = rect.top <= headerMenuMaxTopPx;
+					const sizeable =
+						rect.width >= headerMenuMinWidthPx ||
+						rect.height >= headerMenuMinHeightPx;
+					const hasMenuRole =
+						panel.matches('[role="menu"], [role="menubar"]') ||
+						panel.querySelector('[role="menuitem"], a, button');
 
-				if (nearTop && sizeable && hasMenuRole) {
-					panel.style.setProperty("display", "none", "important");
-					panel.style.setProperty("visibility", "hidden", "important");
-					panel.style.setProperty("opacity", "0", "important");
-					panel.style.setProperty("max-height", "0", "important");
-					panel.style.setProperty("overflow", "hidden", "important");
+					if (nearTop && sizeable && hasMenuRole) {
+						panel.style.setProperty("display", "none", "important");
+						panel.style.setProperty("visibility", "hidden", "important");
+						panel.style.setProperty("opacity", "0", "important");
+						panel.style.setProperty("max-height", "0", "important");
+						panel.style.setProperty("overflow", "hidden", "important");
+					}
 				}
-			}
 
-			document
-				.querySelectorAll(
-					':is(header, nav, .elementor-location-header) [aria-expanded="true"]',
-				)
-				.forEach((el) => el.setAttribute("aria-expanded", "false"));
+				document
+					.querySelectorAll(
+						':is(header, nav, .elementor-location-header) [aria-expanded="true"]',
+					)
+					.forEach((el) => el.setAttribute("aria-expanded", "false"));
 
-			document
-				.querySelectorAll(
-					":is(header, nav) :is(.open, .show, .active, .current-menu-ancestor, .current_page_ancestor)",
-				)
-				.forEach((el) => {
-					el.classList.remove(
-						"open",
-						"show",
-						"active",
-						"current-menu-ancestor",
-						"current_page_ancestor",
-					);
-				});
+				document
+					.querySelectorAll(
+						":is(header, nav) :is(.open, .show, .active, .current-menu-ancestor, .current_page_ancestor)",
+					)
+					.forEach((el) => {
+						el.classList.remove(
+							"open",
+							"show",
+							"active",
+							"current-menu-ancestor",
+							"current_page_ancestor",
+						);
+					});
 			},
 			{
 				headerMenuPanelSelector: HEADER_MENU_PANEL_SELECTOR,
@@ -466,6 +466,11 @@ async function stabilizePage(page, path = "") {
 			await page.evaluate(forceElementsVisible, VISIBILITY_FIX_SELECTOR);
 
 			await page.evaluate(async (isExtraDeep) => {
+				const SCROLL_STEP_RATIO = isExtraDeep ? 0.5 : 0.6;
+				const SCROLL_DELAY_MS = isExtraDeep ? 300 : 220;
+				const ANCHOR_LIMIT = isExtraDeep ? 320 : 220;
+				const ANCHOR_DELAY_MS = isExtraDeep ? 95 : 70;
+
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 				for (const iframe of Array.from(document.querySelectorAll("iframe"))) {
@@ -481,17 +486,14 @@ async function stabilizePage(page, path = "") {
 					);
 
 				const viewport = Math.max(window.innerHeight || 800, 800);
-				const step = Math.max(
-					180,
-					Math.floor(viewport * (isExtraDeep ? 0.5 : 0.6)),
-				);
+				const step = Math.max(180, Math.floor(viewport * SCROLL_STEP_RATIO));
 				let height = getHeight();
 
 				for (let y = 0; y <= height; y += step) {
 					window.scrollTo(0, y);
 					window.dispatchEvent(new Event("scroll"));
 					window.dispatchEvent(new Event("resize"));
-					await delay(isExtraDeep ? 300 : 220);
+					await delay(SCROLL_DELAY_MS);
 
 					const newHeight = getHeight();
 					if (newHeight > height) height = newHeight;
@@ -503,12 +505,12 @@ async function stabilizePage(page, path = "") {
 					),
 				)
 					.filter((el) => el.getBoundingClientRect().width > 10)
-					.slice(0, isExtraDeep ? 320 : 220);
+					.slice(0, ANCHOR_LIMIT);
 
 				for (const el of anchors) {
 					el.scrollIntoView({ behavior: "instant", block: "center" });
 					window.dispatchEvent(new Event("scroll"));
-					await delay(isExtraDeep ? 95 : 70);
+					await delay(ANCHOR_DELAY_MS);
 				}
 
 				window.scrollTo(0, 0);
@@ -551,9 +553,7 @@ async function stabilizePage(page, path = "") {
 					},
 					{ timeout: 12000 },
 				)
-				.catch((e) =>
-					warnNonFatal("deep hydration image completion check", e),
-				);
+				.catch((e) => warnNonFatal("deep hydration image completion check", e));
 
 			try {
 				await page.waitForLoadState("networkidle", {
