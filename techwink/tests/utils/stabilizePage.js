@@ -6,6 +6,8 @@ const NO_SCROLL_PAGES = [
 const PARTNERS_PATH = "/partners/";
 const CAREERS_PATH = "/careers/";
 const FONTS_READY_TIMEOUT_MS = 5000;
+const DEFAULT_FINAL_NETWORK_IDLE_TIMEOUT_MS = 5000;
+const DEFAULT_FINAL_WAIT_MS = 800;
 const EXTRA_DEEP_HYDRATION_PATHS = [
 	"/services/",
 	CAREERS_PATH,
@@ -15,6 +17,14 @@ const EXTRA_DEEP_HYDRATION_PATHS = [
 	"/services/startup-product-development/",
 ];
 const IMAGE_LOAD_TIMEOUT_MS = 8000;
+const PARTNER_LOGO_WARMUP_DELAY_MS = 80;
+const CAREERS_ANCHOR_WARMUP_DELAY_MS = 60;
+const DEEP_HYDRATION_NETWORK_IDLE_TIMEOUT_MS = 15000;
+const EXTRA_DEEP_HYDRATION_NETWORK_IDLE_TIMEOUT_MS = 22000;
+const DEEP_HYDRATION_POST_WAIT_MS = 1000;
+const EXTRA_DEEP_HYDRATION_POST_WAIT_MS = 1600;
+const DEEP_HYDRATION_FINAL_WAIT_MS = 1400;
+const EXTRA_DEEP_HYDRATION_FINAL_WAIT_MS = 2000;
 const HYDRATE_IMAGE_CONCURRENCY = 8;
 const HEADER_MENU_PANEL_SELECTOR =
 	'.elementor-nav-menu--dropdown, .elementor-nav-menu__container, [class*="mega-menu"], [class*="sub-menu"]';
@@ -254,7 +264,11 @@ async function stabilizePartnersPage(page) {
 		await hydrateLazyImages(page);
 
 		await page.evaluate(
-			async ({ lazyAttrCandidates, partnerKeywords }) => {
+			async ({
+				lazyAttrCandidates,
+				partnerKeywords,
+				partnerLogoWarmupDelayMs,
+			}) => {
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 				const logoImages = Array.from(document.querySelectorAll("img"));
@@ -280,7 +294,7 @@ async function stabilizePartnersPage(page) {
 					img.style.setProperty("transform", "none", "important");
 
 					img.scrollIntoView({ behavior: "instant", block: "center" });
-					await delay(80);
+					await delay(partnerLogoWarmupDelayMs);
 				}
 
 				window.scrollTo(0, 0);
@@ -288,6 +302,7 @@ async function stabilizePartnersPage(page) {
 			{
 				lazyAttrCandidates: LAZY_ATTR_CANDIDATES,
 				partnerKeywords: PARTNER_KEYWORDS,
+				partnerLogoWarmupDelayMs: PARTNER_LOGO_WARMUP_DELAY_MS,
 			},
 		);
 	} catch (e) {
@@ -333,7 +348,7 @@ async function stabilizeCareersPage(page) {
 		await page.evaluate(forceElementsVisible, VISIBILITY_FIX_SELECTOR);
 
 		await page.evaluate(
-			async ({ anchors }) => {
+			async ({ anchors, careersAnchorWarmupDelayMs }) => {
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 				for (const img of Array.from(document.querySelectorAll("img"))) {
@@ -344,7 +359,7 @@ async function stabilizeCareersPage(page) {
 				for (const selector of anchors) {
 					for (const node of Array.from(document.querySelectorAll(selector))) {
 						node.scrollIntoView({ behavior: "instant", block: "center" });
-						await delay(60);
+						await delay(careersAnchorWarmupDelayMs);
 					}
 				}
 
@@ -352,6 +367,7 @@ async function stabilizeCareersPage(page) {
 			},
 			{
 				anchors: CAREERS_WARMUP_ANCHORS,
+				careersAnchorWarmupDelayMs: CAREERS_ANCHOR_WARMUP_DELAY_MS,
 			},
 		);
 	} catch (e) {
@@ -557,12 +573,18 @@ async function stabilizePage(page, path = "") {
 
 			try {
 				await page.waitForLoadState("networkidle", {
-					timeout: isExtraDeepHydration ? 22000 : 15000,
+					timeout: isExtraDeepHydration
+						? EXTRA_DEEP_HYDRATION_NETWORK_IDLE_TIMEOUT_MS
+						: DEEP_HYDRATION_NETWORK_IDLE_TIMEOUT_MS,
 				});
 			} catch (e) {
 				warnNonFatal("deep hydration network idle", e);
 			}
-			await page.waitForTimeout(isExtraDeepHydration ? 1600 : 1000);
+			await page.waitForTimeout(
+				isExtraDeepHydration
+					? EXTRA_DEEP_HYDRATION_POST_WAIT_MS
+					: DEEP_HYDRATION_POST_WAIT_MS,
+			);
 		} catch (e) {
 			warnNonFatal("deep hydration block", e);
 		}
@@ -653,7 +675,11 @@ async function stabilizePage(page, path = "") {
 						await waitImageSettled(img, imageLoadTimeoutMs);
 
 						if (img.naturalWidth > 0 && typeof img.decode === "function") {
-							await img.decode().catch(() => {});
+							await img.decode().catch((e) => {
+								console.warn(
+									`[stabilizePage] image decode failed for ${img.src || "(unknown src)"}: ${e?.message || e}`,
+								);
+							});
 						}
 					}),
 				);
@@ -667,16 +693,16 @@ async function stabilizePage(page, path = "") {
 	}
 
 	// 9️⃣ Final settle
-	let networkIdleTimeout = 5000;
-	let finalWait = 800;
+	let networkIdleTimeout = DEFAULT_FINAL_NETWORK_IDLE_TIMEOUT_MS;
+	let finalWait = DEFAULT_FINAL_WAIT_MS;
 
 	if (needsDeepHydration) {
 		if (isExtraDeepHydration) {
-			networkIdleTimeout = 22000;
-			finalWait = 2000;
+			networkIdleTimeout = EXTRA_DEEP_HYDRATION_NETWORK_IDLE_TIMEOUT_MS;
+			finalWait = EXTRA_DEEP_HYDRATION_FINAL_WAIT_MS;
 		} else {
-			networkIdleTimeout = 15000;
-			finalWait = 1400;
+			networkIdleTimeout = DEEP_HYDRATION_NETWORK_IDLE_TIMEOUT_MS;
+			finalWait = DEEP_HYDRATION_FINAL_WAIT_MS;
 		}
 	}
 
