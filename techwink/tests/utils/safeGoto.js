@@ -16,7 +16,11 @@ async function safeGoto(page, url, options = {}, retries = 2) {
 
 			try {
 				await page.waitForLoadState("networkidle", { timeout: 10000 });
-			} catch {}
+			} catch (e) {
+				console.warn(
+					`[safeGoto] Timed out waiting for networkidle on ${url}: ${e.message}`,
+				);
+			}
 
 			return;
 		} catch (err) {

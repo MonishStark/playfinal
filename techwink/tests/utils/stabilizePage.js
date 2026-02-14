@@ -66,13 +66,10 @@ async function hydrateLazyImages(page) {
 
 		for (let i = start; i < end; i++) {
 			hydrationTasks.push(
-				images.nth(i).evaluate(
-					hydrateLazyImageElement,
-					{
-						lazyAttrCandidates: LAZY_ATTR_CANDIDATES,
-						lazySrcsetAttrCandidates: LAZY_SRCSET_ATTR_CANDIDATES,
-					},
-				),
+				images.nth(i).evaluate(hydrateLazyImageElement, {
+					lazyAttrCandidates: LAZY_ATTR_CANDIDATES,
+					lazySrcsetAttrCandidates: LAZY_SRCSET_ATTR_CANDIDATES,
+				}),
 			);
 		}
 
@@ -246,7 +243,7 @@ async function stabilizePage(page, path = "") {
 					"lenovo",
 					"dell",
 					"netapp",
-					"service",
+					"servicenow",
 					"ethereum",
 					"polygon",
 					"paypal",
@@ -499,7 +496,9 @@ async function stabilizePage(page, path = "") {
 					},
 					{ timeout: 15000 },
 				)
-				.catch(() => {});
+				.catch((e) =>
+					warnNonFatal("deep hydration element visibility check", e),
+				);
 
 			await page
 				.waitForFunction(
@@ -512,7 +511,9 @@ async function stabilizePage(page, path = "") {
 					},
 					{ timeout: 12000 },
 				)
-				.catch(() => {});
+				.catch((e) =>
+					warnNonFatal("deep hydration image completion check", e),
+				);
 
 			try {
 				await page.waitForLoadState("networkidle", {
