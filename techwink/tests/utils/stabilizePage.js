@@ -219,6 +219,146 @@ async function collapseHeaderDropdowns(page) {
 	}
 }
 
+async function stabilizePartnersPage(page) {
+	try {
+		const partnerAltSelectors = buildPartnerAltSelectors(PARTNER_KEYWORDS);
+
+		await page.addStyleTag({
+			content: `
+          /* Keep partner logos fully visible for deterministic snapshots */
+          .elementor-widget-image img,
+          .elementor-image img,
+					${partnerAltSelectors} {
+            opacity: 1 !important;
+            visibility: visible !important;
+            filter: none !important;
+            transform: none !important;
+          }
+        `,
+		});
+
+		await hydrateLazyImages(page);
+
+		await page.evaluate(
+			async ({ lazyAttrCandidates, partnerKeywords }) => {
+				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+				const logoImages = Array.from(document.querySelectorAll("img"));
+				for (const img of logoImages) {
+					const alt = (img.getAttribute("alt") || "").toLowerCase();
+					const src = (img.getAttribute("src") || "").toLowerCase();
+					const lazyAttrText = lazyAttrCandidates
+						.map((attr) => String(img.getAttribute(attr) || ""))
+						.join(" ")
+						.toLowerCase();
+
+					const searchableText = `${alt} ${src} ${lazyAttrText}`;
+					const isPartnerLogo =
+						partnerKeywords.some((kw) => searchableText.includes(kw)) ||
+						searchableText.includes("partner");
+
+					if (!isPartnerLogo) continue;
+
+					img.loading = "eager";
+					img.style.setProperty("opacity", "1", "important");
+					img.style.setProperty("visibility", "visible", "important");
+					img.style.setProperty("filter", "none", "important");
+					img.style.setProperty("transform", "none", "important");
+
+					img.scrollIntoView({ behavior: "instant", block: "center" });
+					await delay(80);
+				}
+
+				window.scrollTo(0, 0);
+			},
+			{
+				lazyAttrCandidates: LAZY_ATTR_CANDIDATES,
+				partnerKeywords: PARTNER_KEYWORDS,
+			},
+		);
+	} catch (e) {
+		warnNonFatal("partners stabilization", e);
+	}
+}
+
+async function stabilizeCareersPage(page) {
+	try {
+		await page.addStyleTag({
+			content: `
+          /* Force all career blocks/text/cards to final rendered state */
+          .elementor-section,
+          .elementor-column,
+          .elementor-widget,
+          .elementor-widget-container,
+          .elementor-top-column,
+          .career-card,
+          .careers,
+          .careers * {
+            opacity: 1 !important;
+            visibility: visible !important;
+            transform: none !important;
+            filter: none !important;
+          }
+
+          /* Elementor animation classes */
+          .elementor-invisible,
+          .elementor-animated,
+          [data-settings*="_animation"],
+          [data-settings*="animation"],
+          [style*="opacity: 0"],
+          [style*="opacity:0"] {
+            opacity: 1 !important;
+            visibility: visible !important;
+            transform: none !important;
+            filter: none !important;
+          }
+        `,
+		});
+
+		await hydrateLazyImages(page);
+
+		await page.evaluate(
+			async ({ anchors }) => {
+				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+				const visibilityFixSelector =
+					'[style*="opacity"], [style*="visibility"], .elementor-invisible, .wow, [data-aos], [data-animate], [data-settings*="animation"], [data-settings*="_animation"], [class*="fade"], [class*="slide"], [class*="zoom"], .animated';
+
+				// Force lazy assets and animation styles into final state.
+				for (const el of Array.from(
+					document.querySelectorAll(visibilityFixSelector),
+				)) {
+					const style = window.getComputedStyle(el);
+					if (Number.parseFloat(style.opacity || "1") < 1) {
+						el.style.setProperty("opacity", "1", "important");
+					}
+					if (style.visibility === "hidden") {
+						el.style.setProperty("visibility", "visible", "important");
+					}
+				}
+
+				for (const img of Array.from(document.querySelectorAll("img"))) {
+					img.loading = "eager";
+				}
+
+				// Warm up the sections that are often animation-triggered on this page.
+				for (const selector of anchors) {
+					for (const node of Array.from(document.querySelectorAll(selector))) {
+						node.scrollIntoView({ behavior: "instant", block: "center" });
+						await delay(60);
+					}
+				}
+
+				window.scrollTo(0, 0);
+			},
+			{
+				anchors: CAREERS_WARMUP_ANCHORS,
+			},
+		);
+	} catch (e) {
+		warnNonFatal("careers stabilization", e);
+	}
+}
+
 async function stabilizePage(page, path = "") {
 	const skipScroll = isNoScrollPath(path);
 	const needsDeepHydration = !skipScroll;
@@ -281,138 +421,12 @@ async function stabilizePage(page, path = "") {
 
 	// 4.1️⃣ Partners page: force all partner logos to visible/eager and warm them up.
 	if (path.startsWith(PARTNERS_PATH)) {
-		try {
-			const partnerAltSelectors = buildPartnerAltSelectors(PARTNER_KEYWORDS);
-
-			await page.addStyleTag({
-				content: `
-          /* Keep partner logos fully visible for deterministic snapshots */
-          .elementor-widget-image img,
-          .elementor-image img,
-					${partnerAltSelectors} {
-            opacity: 1 !important;
-            visibility: visible !important;
-            filter: none !important;
-            transform: none !important;
-          }
-        `,
-			});
-
-			await hydrateLazyImages(page);
-
-			await page.evaluate(async ({ lazyAttrCandidates, partnerKeywords }) => {
-				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-				const logoImages = Array.from(document.querySelectorAll("img"));
-				for (const img of logoImages) {
-					const alt = (img.getAttribute("alt") || "").toLowerCase();
-					const src = (img.getAttribute("src") || "").toLowerCase();
-					const lazyAttrText = lazyAttrCandidates
-						.map((attr) => String(img.getAttribute(attr) || ""))
-						.join(" ")
-						.toLowerCase();
-
-					const searchableText = `${alt} ${src} ${lazyAttrText}`;
-					const isPartnerLogo =
-						partnerKeywords.some((kw) => searchableText.includes(kw)) ||
-						searchableText.includes("partner");
-
-					if (!isPartnerLogo) continue;
-
-					img.loading = "eager";
-					img.style.setProperty("opacity", "1", "important");
-					img.style.setProperty("visibility", "visible", "important");
-					img.style.setProperty("filter", "none", "important");
-					img.style.setProperty("transform", "none", "important");
-
-					img.scrollIntoView({ behavior: "instant", block: "center" });
-					await delay(80);
-				}
-
-				window.scrollTo(0, 0);
-			}, {
-				lazyAttrCandidates: LAZY_ATTR_CANDIDATES,
-				partnerKeywords: PARTNER_KEYWORDS,
-			});
-		} catch (e) {
-			warnNonFatal("partners stabilization", e);
-		}
+		await stabilizePartnersPage(page);
 	}
 
 	// 4.2️⃣ Careers page: reveal animation-gated cards/form blocks that can stay faded.
 	if (path.startsWith(CAREERS_PATH)) {
-		try {
-			await page.addStyleTag({
-				content: `
-          /* Force all career blocks/text/cards to final rendered state */
-          .elementor-section,
-          .elementor-column,
-          .elementor-widget,
-          .elementor-widget-container,
-          .elementor-top-column,
-          .career-card,
-          .careers,
-          .careers * {
-            opacity: 1 !important;
-            visibility: visible !important;
-            transform: none !important;
-            filter: none !important;
-          }
-
-          /* Elementor animation classes */
-          .elementor-invisible,
-          .elementor-animated,
-          [data-settings*="_animation"],
-          [data-settings*="animation"],
-          [style*="opacity: 0"],
-          [style*="opacity:0"] {
-            opacity: 1 !important;
-            visibility: visible !important;
-            transform: none !important;
-            filter: none !important;
-          }
-        `,
-			});
-
-			await hydrateLazyImages(page);
-
-			await page.evaluate(async ({ anchors }) => {
-				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-				const visibilityFixSelector =
-					'[style*="opacity"], [style*="visibility"], .elementor-invisible, .wow, [data-aos], [data-animate], [data-settings*="animation"], [data-settings*="_animation"], [class*="fade"], [class*="slide"], [class*="zoom"], .animated';
-
-				// Force lazy assets and animation styles into final state.
-				for (const el of Array.from(
-					document.querySelectorAll(visibilityFixSelector),
-				)) {
-					const style = window.getComputedStyle(el);
-					if (Number.parseFloat(style.opacity || "1") < 1) {
-						el.style.setProperty("opacity", "1", "important");
-					}
-					if (style.visibility === "hidden") {
-						el.style.setProperty("visibility", "visible", "important");
-					}
-				}
-
-				for (const img of Array.from(document.querySelectorAll("img"))) {
-					img.loading = "eager";
-				}
-
-				// Warm up the sections that are often animation-triggered on this page.
-				for (const selector of anchors) {
-					for (const node of Array.from(document.querySelectorAll(selector))) {
-						node.scrollIntoView({ behavior: "instant", block: "center" });
-						await delay(60);
-					}
-				}
-
-				window.scrollTo(0, 0);
-			}, {
-				anchors: CAREERS_WARMUP_ANCHORS,
-			});
-		} catch (e) {
-			warnNonFatal("careers stabilization", e);
-		}
+		await stabilizeCareersPage(page);
 	}
 
 	// 4.3️⃣ Deep hydration pass for high-scroll / lazy-heavy pages.
