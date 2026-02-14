@@ -133,7 +133,9 @@ async function retryOnNavigation(page, context, action, maxAttempts = 2) {
 				.waitForLoadState("domcontentloaded", {
 					timeout: FONTS_READY_TIMEOUT_MS,
 				})
-				.catch(() => {});
+				.catch((waitError) =>
+					warnNonFatal(`${context} (waitForLoadState after nav)`, waitError),
+				);
 			await page.waitForTimeout(200);
 		}
 	}
