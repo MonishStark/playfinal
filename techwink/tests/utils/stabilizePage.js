@@ -34,6 +34,8 @@ const LAZY_ATTR_CANDIDATES = [
 	"data-bg",
 ];
 const LAZY_SRCSET_ATTR_CANDIDATES = ["data-srcset", "data-lazy-srcset"];
+const VISIBILITY_FIX_SELECTOR =
+	'[style*="opacity"], [style*="visibility"], .elementor-invisible, .wow, [data-aos], [data-animate], [data-settings*="animation"], [data-settings*="_animation"], [class*="fade"], [class*="slide"], [class*="zoom"], .animated';
 const PARTNER_KEYWORDS = [
 	"cisco",
 	"aws",
@@ -97,6 +99,18 @@ function hydrateLazyImageElement(
 			.find(Boolean);
 		if (lazySrcset) {
 			img.setAttribute("srcset", lazySrcset);
+		}
+	}
+}
+
+function forceElementsVisible(selector) {
+	for (const el of Array.from(document.querySelectorAll(selector))) {
+		const style = window.getComputedStyle(el);
+		if (Number.parseFloat(style.opacity || "1") < 1) {
+			el.style.setProperty("opacity", "1", "important");
+		}
+		if (style.visibility === "hidden") {
+			el.style.setProperty("visibility", "visible", "important");
 		}
 	}
 }
@@ -316,25 +330,11 @@ async function stabilizeCareersPage(page) {
 		});
 
 		await hydrateLazyImages(page);
+		await page.evaluate(forceElementsVisible, VISIBILITY_FIX_SELECTOR);
 
 		await page.evaluate(
 			async ({ anchors }) => {
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-				const visibilityFixSelector =
-					'[style*="opacity"], [style*="visibility"], .elementor-invisible, .wow, [data-aos], [data-animate], [data-settings*="animation"], [data-settings*="_animation"], [class*="fade"], [class*="slide"], [class*="zoom"], .animated';
-
-				// Force lazy assets and animation styles into final state.
-				for (const el of Array.from(
-					document.querySelectorAll(visibilityFixSelector),
-				)) {
-					const style = window.getComputedStyle(el);
-					if (Number.parseFloat(style.opacity || "1") < 1) {
-						el.style.setProperty("opacity", "1", "important");
-					}
-					if (style.visibility === "hidden") {
-						el.style.setProperty("visibility", "visible", "important");
-					}
-				}
 
 				for (const img of Array.from(document.querySelectorAll("img"))) {
 					img.loading = "eager";
@@ -463,23 +463,10 @@ async function stabilizePage(page, path = "") {
         `,
 			});
 
+			await page.evaluate(forceElementsVisible, VISIBILITY_FIX_SELECTOR);
+
 			await page.evaluate(async (isExtraDeep) => {
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-				const visibilityFixSelector =
-					'[style*="opacity"], [style*="visibility"], .elementor-invisible, .wow, [data-aos], [data-animate], [data-settings*="animation"], [data-settings*="_animation"], [class*="fade"], [class*="slide"], [class*="zoom"], .animated';
-
-				const allNodes = Array.from(
-					document.querySelectorAll(visibilityFixSelector),
-				);
-				for (const node of allNodes) {
-					const style = window.getComputedStyle(node);
-					if (Number.parseFloat(style.opacity || "1") < 1) {
-						node.style.setProperty("opacity", "1", "important");
-					}
-					if (style.visibility === "hidden") {
-						node.style.setProperty("visibility", "visible", "important");
-					}
-				}
 
 				for (const iframe of Array.from(document.querySelectorAll("iframe"))) {
 					iframe.setAttribute("loading", "eager");
