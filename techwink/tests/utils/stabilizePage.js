@@ -119,6 +119,78 @@ function isExtraDeepHydrationPath(path) {
 	return EXTRA_DEEP_HYDRATION_PATHS.some((p) => path.startsWith(p));
 }
 
+async function collapseHeaderDropdowns(page) {
+	try {
+		await page.addStyleTag({
+			content: `
+        /* Hide common nav dropdown/mega-menu surfaces (including detached overlays) */
+        :is(header, .elementor-location-header, .main-header, nav) :is(.sub-menu, .mega-menu, .mega-sub-menu),
+        :is(header, .elementor-location-header, .main-header) .elementor-nav-menu--dropdown,
+        header .elementor-nav-menu__container,
+        .elementor-nav-menu--dropdown,
+        .mega-menu,
+        .mega-sub-menu,
+        .sub-menu,
+        [class*="mega-menu"],
+        [class*="sub-menu"] {
+          pointer-events: none !important;
+        }
+      `,
+		});
+
+		await page.evaluate(() => {
+			const maybeMenuPanels = Array.from(
+				document.querySelectorAll(
+					'.sub-menu, .mega-menu, .mega-sub-menu, .elementor-nav-menu--dropdown, .elementor-nav-menu__container, [class*="mega-menu"], [class*="sub-menu"]',
+				),
+			);
+
+			for (const panel of maybeMenuPanels) {
+				const rect = panel.getBoundingClientRect();
+				const nearTop = rect.top <= 260;
+				const sizeable = rect.width >= 180 || rect.height >= 40;
+				const hasMenuRole =
+					panel.matches('[role="menu"], [role="menubar"]') ||
+					panel.querySelector('[role="menuitem"], a, button');
+
+				if (nearTop && sizeable && hasMenuRole) {
+					panel.style.setProperty("display", "none", "important");
+					panel.style.setProperty("visibility", "hidden", "important");
+					panel.style.setProperty("opacity", "0", "important");
+					panel.style.setProperty("max-height", "0", "important");
+					panel.style.setProperty("overflow", "hidden", "important");
+				}
+			}
+
+			document
+				.querySelectorAll(
+					'header [aria-expanded="true"], nav [aria-expanded="true"], .elementor-location-header [aria-expanded="true"]',
+				)
+				.forEach((el) => el.setAttribute("aria-expanded", "false"));
+
+			document
+				.querySelectorAll(
+					"header .current-menu-ancestor, header .current_page_ancestor, header .open, header .show, header .active, nav .open, nav .show, nav .active",
+				)
+				.forEach((el) => {
+					el.classList.remove(
+						"open",
+						"show",
+						"active",
+						"current-menu-ancestor",
+						"current_page_ancestor",
+					);
+				});
+		});
+
+		const viewport = page.viewportSize();
+		const safeY = Math.min(500, Math.max(200, (viewport?.height || 800) - 120));
+		await page.mouse.move(24, safeY);
+	} catch (e) {
+		warnNonFatal("collapse header dropdowns", e);
+	}
+}
+
 async function stabilizePage(page, path = "") {
 	const skipScroll = isNoScrollPath(path);
 	const needsDeepHydration = !skipScroll;
@@ -174,46 +246,7 @@ async function stabilizePage(page, path = "") {
 	}
 
 	// 3.1️⃣ Ensure header dropdown/mega-menu overlays are never captured.
-	try {
-		await page.addStyleTag({
-			content: `
-	:is(header, .elementor-location-header, .main-header, nav) :is(.sub-menu, .mega-menu, .mega-sub-menu),
-	:is(header, .elementor-location-header, .main-header) .elementor-nav-menu--dropdown,
-	header .elementor-nav-menu__container {
-          display: none !important;
-          visibility: hidden !important;
-          opacity: 0 !important;
-          pointer-events: none !important;
-          transform: none !important;
-          max-height: 0 !important;
-          overflow: hidden !important;
-        }
-      `,
-		});
-
-		await page.evaluate(() => {
-			document
-				.querySelectorAll(
-					'header [aria-expanded="true"], nav [aria-expanded="true"], .elementor-location-header [aria-expanded="true"]',
-				)
-				.forEach((el) => el.setAttribute("aria-expanded", "false"));
-
-			document
-				.querySelectorAll(
-					"header .current-menu-ancestor, header .current_page_ancestor, header .open, header .show, nav .open, nav .show",
-				)
-				.forEach((el) => {
-					el.classList.remove(
-						"open",
-						"show",
-						"current-menu-ancestor",
-						"current_page_ancestor",
-					);
-				});
-		});
-	} catch (e) {
-		warnNonFatal("header dropdown stabilization", e);
-	}
+	await collapseHeaderDropdowns(page);
 
 	// 4️⃣ Force eager images (safe per-image)
 	await hydrateLazyImages(page);
@@ -550,6 +583,9 @@ async function stabilizePage(page, path = "") {
 	} catch (e) {
 		warnNonFatal("scroll reset to top", e);
 	}
+
+	// 7.1️⃣ Re-collapse header menus (some themes reopen on hover after scroll-to-top).
+	await collapseHeaderDropdowns(page);
 
 	// 8️⃣ Wait for visible images to fully load/decode
 	try {
