@@ -20,7 +20,7 @@ async function safeGoto(page, url, options = {}, retries = 2) {
 				...options,
 			});
 
-			const status = response?.status?.();
+			const status = response?.status();
 			if (typeof status === "number" && status >= 500) {
 				throw new Http5xxError(status, url);
 			}
