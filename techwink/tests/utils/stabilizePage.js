@@ -44,8 +44,10 @@ const LAZY_ATTR_CANDIDATES = [
 	"data-original",
 ];
 const LAZY_SRCSET_ATTR_CANDIDATES = ["data-srcset", "data-lazy-srcset"];
+const ANIMATION_MARKER_SELECTOR =
+	'.elementor-invisible, .wow, [data-aos], [data-animate], [data-settings*="animation"], [data-settings*="_animation"], [class*="fade"], [class*="slide"], [class*="zoom"], .animated';
 const VISIBILITY_FIX_SELECTOR =
-	'[style*="opacity:0"], [style*="opacity: 0"], [style*="visibility:hidden"], [style*="visibility: hidden"]';
+	'[style*="opacity:0"], [style*="opacity: 0"], [style*="visibility:hidden"], [style*="visibility: hidden"], .elementor-invisible, .wow, [data-aos], [data-animate], [data-settings*="animation"], [data-settings*="_animation"], [class*="fade"], [class*="slide"], [class*="zoom"], .animated';
 const PARTNER_KEYWORDS = [
 	"cisco",
 	"aws",
@@ -128,12 +130,17 @@ function hydrateLazyImageElement(
 	}
 }
 
-function forceElementsVisible(selector) {
+function forceElementsVisible({
+	selector,
+	opacityThreshold,
+	animationMarkerSelector,
+}) {
 	for (const el of Array.from(document.querySelectorAll(selector))) {
 		const style = window.getComputedStyle(el);
-		if (
-			Number.parseFloat(style.opacity || "1") <= FORCE_VISIBLE_OPACITY_THRESHOLD
-		) {
+		const opacity = Number.parseFloat(style.opacity || "1");
+		const isAnimationMarked = el.matches(animationMarkerSelector);
+
+		if (isAnimationMarked ? opacity < 1 : opacity <= opacityThreshold) {
 			el.style.setProperty("opacity", "1", "important");
 		}
 		if (style.visibility === "hidden") {
@@ -334,8 +341,9 @@ async function stabilizePartnersPage(page) {
 }
 
 async function stabilizeCareersPage(page) {
-	try {
-		await page.addStyleTag({
+	for (let attempt = 0; attempt < 2; attempt++) {
+		try {
+			await page.addStyleTag({
 			content: `
           /* Force all career blocks/text/cards to final rendered state */
           .elementor-section,
@@ -365,30 +373,58 @@ async function stabilizeCareersPage(page) {
             filter: none !important;
           }
         `,
-		});
-		await page.evaluate(forceElementsVisible, VISIBILITY_FIX_SELECTOR);
+			});
+			await page.evaluate(forceElementsVisible, {
+				selector: VISIBILITY_FIX_SELECTOR,
+				opacityThreshold: FORCE_VISIBLE_OPACITY_THRESHOLD,
+				animationMarkerSelector: ANIMATION_MARKER_SELECTOR,
+			});
 
-		await page.evaluate(
-			async ({ anchors, careersAnchorWarmupDelayMs }) => {
-				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+			await page.evaluate(
+				async ({ anchors, careersAnchorWarmupDelayMs }) => {
+					const delay = (ms) =>
+						new Promise((resolve) => setTimeout(resolve, ms));
 
-				// Warm up the sections that are often animation-triggered on this page.
-				for (const node of Array.from(
-					document.querySelectorAll(anchors.join(",")),
-				)) {
-					node.scrollIntoView({ behavior: "instant", block: "center" });
-					await delay(careersAnchorWarmupDelayMs);
-				}
+					// Warm up the sections that are often animation-triggered on this page.
+					for (const node of Array.from(
+						document.querySelectorAll(anchors.join(",")),
+					)) {
+						node.scrollIntoView({ behavior: "instant", block: "center" });
+						await delay(careersAnchorWarmupDelayMs);
+					}
 
-				window.scrollTo(0, 0);
-			},
-			{
-				anchors: CAREERS_WARMUP_ANCHORS,
-				careersAnchorWarmupDelayMs: CAREERS_ANCHOR_WARMUP_DELAY_MS,
-			},
-		);
-	} catch (e) {
-		warnNonFatal("careers stabilization", e);
+					window.scrollTo(0, 0);
+				},
+				{
+					anchors: CAREERS_WARMUP_ANCHORS,
+					careersAnchorWarmupDelayMs: CAREERS_ANCHOR_WARMUP_DELAY_MS,
+				},
+			);
+
+			break;
+		} catch (e) {
+			const message = String(e?.message || "");
+			const shouldRetryAfterNavigation =
+				attempt === 0 && message.includes("Execution context was destroyed");
+
+			warnNonFatal(
+				shouldRetryAfterNavigation
+					? "careers stabilization (retrying after navigation)"
+					: "careers stabilization",
+				e,
+			);
+
+			if (!shouldRetryAfterNavigation) {
+				break;
+			}
+
+			await page
+				.waitForLoadState("domcontentloaded", {
+					timeout: FONTS_READY_TIMEOUT_MS,
+				})
+				.catch(() => {});
+			await page.waitForTimeout(200);
+		}
 	}
 }
 
@@ -465,7 +501,8 @@ async function stabilizePage(page, path = "") {
 
 	// 4.3️⃣ Deep hydration pass for high-scroll / lazy-heavy pages.
 	if (needsDeepHydration) {
-		try {
+		for (let attempt = 0; attempt < 2; attempt++) {
+			try {
 			await page.addStyleTag({
 				content: `
           /* Keep delayed/animated blocks in final state for full-page captures */
@@ -497,7 +534,11 @@ async function stabilizePage(page, path = "") {
         `,
 			});
 
-			await page.evaluate(forceElementsVisible, VISIBILITY_FIX_SELECTOR);
+			await page.evaluate(forceElementsVisible, {
+				selector: VISIBILITY_FIX_SELECTOR,
+				opacityThreshold: FORCE_VISIBLE_OPACITY_THRESHOLD,
+				animationMarkerSelector: ANIMATION_MARKER_SELECTOR,
+			});
 
 			await page.evaluate(async (isExtraDeep) => {
 				const SCROLL_STEP_RATIO = isExtraDeep ? 0.5 : 0.6;
@@ -617,8 +658,32 @@ async function stabilizePage(page, path = "") {
 					? EXTRA_DEEP_HYDRATION_POST_WAIT_MS
 					: DEEP_HYDRATION_POST_WAIT_MS,
 			);
-		} catch (e) {
-			warnNonFatal("deep hydration block", e);
+
+				break;
+			} catch (e) {
+				const message = String(e?.message || "");
+				const shouldRetryAfterNavigation =
+					attempt === 0 &&
+					message.includes("Execution context was destroyed");
+
+				warnNonFatal(
+					shouldRetryAfterNavigation
+						? "deep hydration block (retrying after navigation)"
+						: "deep hydration block",
+					e,
+				);
+
+				if (!shouldRetryAfterNavigation) {
+					break;
+				}
+
+				await page
+					.waitForLoadState("domcontentloaded", {
+						timeout: FONTS_READY_TIMEOUT_MS,
+					})
+					.catch(() => {});
+				await page.waitForTimeout(200);
+			}
 		}
 	}
 
