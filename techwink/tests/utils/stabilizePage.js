@@ -41,7 +41,6 @@ const LAZY_ATTR_CANDIDATES = [
 	"data-lazy",
 	"data-lazy-src",
 	"data-original",
-	"data-bg",
 ];
 const LAZY_SRCSET_ATTR_CANDIDATES = ["data-srcset", "data-lazy-srcset"];
 const VISIBILITY_FIX_SELECTOR =
