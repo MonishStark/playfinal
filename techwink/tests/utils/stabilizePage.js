@@ -147,19 +147,17 @@ function hydrateLazyImageElement(
 
 	if (img.loading === "lazy") img.loading = "eager";
 
-	const lazySrc = lazyAttrCandidates
-		.map((attr) => String(img.getAttribute(attr) || "").trim())
-		.find(Boolean);
-	if (lazySrc && img.getAttribute("src") !== lazySrc) {
-		img.setAttribute("src", lazySrc);
-	}
+	const setLazyAttribute = (targetAttr, sourceAttrs) => {
+		const lazyValue = sourceAttrs
+			.map((attr) => String(img.getAttribute(attr) || "").trim())
+			.find(Boolean);
+		if (lazyValue && img.getAttribute(targetAttr) !== lazyValue) {
+			img.setAttribute(targetAttr, lazyValue);
+		}
+	};
 
-	const lazySrcset = lazySrcsetAttrCandidates
-		.map((attr) => String(img.getAttribute(attr) || "").trim())
-		.find(Boolean);
-	if (lazySrcset && img.getAttribute("srcset") !== lazySrcset) {
-		img.setAttribute("srcset", lazySrcset);
-	}
+	setLazyAttribute("src", lazyAttrCandidates);
+	setLazyAttribute("srcset", lazySrcsetAttrCandidates);
 }
 
 function forceElementsVisible({
