@@ -136,13 +136,9 @@ async function collapseHeaderDropdowns(page) {
 		await page.addStyleTag({
 			content: `
         /* Hide common nav dropdown/mega-menu surfaces (including detached overlays) */
-        :is(header, .elementor-location-header, .main-header, nav) :is(.sub-menu, .mega-menu, .mega-sub-menu),
+				:is(header, .elementor-location-header, .main-header, nav) :is(.sub-menu, .mega-menu, .mega-sub-menu),
         :is(header, .elementor-location-header, .main-header) .elementor-nav-menu--dropdown,
         header .elementor-nav-menu__container,
-        .elementor-nav-menu--dropdown,
-        .mega-menu,
-        .mega-sub-menu,
-        .sub-menu,
         [class*="mega-menu"],
         [class*="sub-menu"] {
           pointer-events: none !important;
@@ -182,13 +178,13 @@ async function collapseHeaderDropdowns(page) {
 
 			document
 				.querySelectorAll(
-					'header [aria-expanded="true"], nav [aria-expanded="true"], .elementor-location-header [aria-expanded="true"]',
+					':is(header, nav, .elementor-location-header) [aria-expanded="true"]',
 				)
 				.forEach((el) => el.setAttribute("aria-expanded", "false"));
 
 			document
 				.querySelectorAll(
-					"header .current-menu-ancestor, header .current_page_ancestor, :is(header, nav) :is(.open, .show, .active)",
+					":is(header, nav) :is(.open, .show, .active, .current-menu-ancestor, .current_page_ancestor)",
 				)
 				.forEach((el) => {
 					el.classList.remove(
@@ -670,20 +666,27 @@ async function stabilizePage(page, path = "") {
 	}
 
 	// 9️⃣ Final settle
+	let networkIdleTimeout = 5000;
+	let finalWait = 800;
+
+	if (needsDeepHydration) {
+		if (isExtraDeepHydration) {
+			networkIdleTimeout = 22000;
+			finalWait = 2000;
+		} else {
+			networkIdleTimeout = 15000;
+			finalWait = 1400;
+		}
+	}
+
 	try {
 		await page.waitForLoadState("networkidle", {
-			timeout: needsDeepHydration
-				? isExtraDeepHydration
-					? 22000
-					: 15000
-				: 5000,
+			timeout: networkIdleTimeout,
 		});
 	} catch (e) {
 		warnNonFatal("final network idle", e);
 	}
-	await page.waitForTimeout(
-		needsDeepHydration ? (isExtraDeepHydration ? 2000 : 1400) : 800,
-	);
+	await page.waitForTimeout(finalWait);
 
 	// 🔟 Freeze height (stitch-safe)
 	try {
