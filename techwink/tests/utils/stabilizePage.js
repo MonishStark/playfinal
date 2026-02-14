@@ -53,17 +53,25 @@ function hydrateLazyImageElement(
 async function hydrateLazyImages(page) {
 	const images = page.locator("img");
 	const count = await images.count();
+	const concurrency = 8;
 
-	for (let i = 0; i < count; i++) {
-		try {
-			await images.nth(i).evaluate(
-				hydrateLazyImageElement,
-				{
-					lazyAttrCandidates: LAZY_ATTR_CANDIDATES,
-					lazySrcsetAttrCandidates: LAZY_SRCSET_ATTR_CANDIDATES,
-				},
+	for (let start = 0; start < count; start += concurrency) {
+		const end = Math.min(start + concurrency, count);
+		const hydrationTasks = [];
+
+		for (let i = start; i < end; i++) {
+			hydrationTasks.push(
+				images.nth(i).evaluate(
+					hydrateLazyImageElement,
+					{
+						lazyAttrCandidates: LAZY_ATTR_CANDIDATES,
+						lazySrcsetAttrCandidates: LAZY_SRCSET_ATTR_CANDIDATES,
+					},
+				),
 			);
-		} catch {}
+		}
+
+		await Promise.allSettled(hydrationTasks);
 	}
 }
 
@@ -112,7 +120,6 @@ async function stabilizePage(page, path = "") {
 				[class*="fadeIn"],
 				[class*="slideIn"],
 				[class*="zoomIn"],
-				[data-aos],
 				.aos-init,
 				.aos-animate,
 				.animated,
@@ -219,19 +226,17 @@ async function stabilizePage(page, path = "") {
         `,
 			});
 
-			await page.evaluate(async () => {
+			await page.evaluate(async (lazyAttrCandidates) => {
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 				const logoImages = Array.from(document.querySelectorAll("img"));
 				for (const img of logoImages) {
 					const alt = (img.getAttribute("alt") || "").toLowerCase();
 					const src = (img.getAttribute("src") || "").toLowerCase();
-					const dataSrc = (
-						img.getAttribute("data-src") ||
-						img.getAttribute("data-lazy-src") ||
-						img.getAttribute("data-original") ||
-						""
-					).toLowerCase();
+					const lazyAttrText = lazyAttrCandidates
+						.map((attr) => String(img.getAttribute(attr) || ""))
+						.join(" ")
+						.toLowerCase();
 
 					const isPartnerLogo =
 						alt.includes("cisco") ||
@@ -254,18 +259,14 @@ async function stabilizePage(page, path = "") {
 						alt.includes("solana") ||
 						src.includes("partner") ||
 						src.includes("servicenow") ||
-						dataSrc.includes("partner") ||
-						dataSrc.includes("servicenow");
+						lazyAttrText.includes("partner") ||
+						lazyAttrText.includes("servicenow");
 
 					if (!isPartnerLogo) continue;
 
-					const lazySrc =
-						img.dataset?.src ||
-						img.dataset?.lazySrc ||
-						img.dataset?.original ||
-						img.getAttribute("data-src") ||
-						img.getAttribute("data-lazy-src") ||
-						img.getAttribute("data-original");
+					const lazySrc = lazyAttrCandidates
+						.map((attr) => String(img.getAttribute(attr) || "").trim())
+						.find(Boolean);
 
 					if (lazySrc && !img.getAttribute("src")) {
 						img.setAttribute("src", lazySrc);
@@ -282,7 +283,7 @@ async function stabilizePage(page, path = "") {
 				}
 
 				window.scrollTo(0, 0);
-			});
+			}, LAZY_ATTR_CANDIDATES);
 		} catch {}
 	}
 
@@ -321,7 +322,7 @@ async function stabilizePage(page, path = "") {
         `,
 			});
 
-			await page.evaluate(async () => {
+			await page.evaluate(async (lazyAttrCandidates) => {
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 				// Force lazy assets and animation styles into final state.
@@ -336,10 +337,9 @@ async function stabilizePage(page, path = "") {
 				}
 
 				for (const img of Array.from(document.querySelectorAll("img"))) {
-					const lazySrc =
-						img.getAttribute("data-src") ||
-						img.getAttribute("data-lazy-src") ||
-						img.getAttribute("data-original");
+					const lazySrc = lazyAttrCandidates
+						.map((attr) => String(img.getAttribute(attr) || "").trim())
+						.find(Boolean);
 					if (lazySrc && !img.getAttribute("src")) {
 						img.setAttribute("src", lazySrc);
 					}
@@ -363,7 +363,7 @@ async function stabilizePage(page, path = "") {
 				}
 
 				window.scrollTo(0, 0);
-			});
+			}, LAZY_ATTR_CANDIDATES);
 		} catch {}
 	}
 

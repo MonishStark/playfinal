@@ -20,14 +20,12 @@ async function safeGoto(page, url, options = {}, retries = 2) {
 
 			return;
 		} catch (err) {
+			const message = String(err?.message || "");
 			const isNetworkError =
-				err.message.includes("ERR_CONNECTION_CLOSED") ||
-				err.message.includes("ERR_CONNECTION_RESET") ||
-				err.message.includes("net::") ||
-				err.message.includes("HTTP 500") ||
-				err.message.includes("HTTP 502") ||
-				err.message.includes("HTTP 503") ||
-				err.message.includes("HTTP 504");
+				message.includes("ERR_CONNECTION_CLOSED") ||
+				message.includes("ERR_CONNECTION_RESET") ||
+				message.includes("net::") ||
+				/HTTP\s+5\d\d\b/.test(message);
 
 			if (!isNetworkError || attempt > retries) {
 				throw err;
