@@ -7,7 +7,7 @@ const PARTNERS_PATH = "/partners/";
 const CAREERS_PATH = "/careers/";
 const EXTRA_DEEP_HYDRATION_PATHS = [
 	"/services/",
-	"/careers/",
+	CAREERS_PATH,
 	"/contact/",
 	"/services/chatgpt-integration-services/",
 	"/services/nft-marketplace-development/",
@@ -22,6 +22,33 @@ const LAZY_ATTR_CANDIDATES = [
 	"data-bg",
 ];
 const LAZY_SRCSET_ATTR_CANDIDATES = ["data-srcset", "data-lazy-srcset"];
+const PARTNER_KEYWORDS = [
+	"cisco",
+	"aws",
+	"google cloud",
+	"red hat",
+	"openstack",
+	"lenovo",
+	"dell",
+	"netapp",
+	"servicenow",
+	"ethereum",
+	"polygon",
+	"paypal",
+	"coinbase",
+	"cardano",
+	"binance",
+	"metamask",
+	"stripe",
+	"solana",
+];
+const CAREERS_WARMUP_ANCHORS = [
+	"h1",
+	"h2",
+	"form",
+	'input[type="file"]',
+	'button[type="submit"]',
+];
 
 function warnNonFatal(context, error) {
 	const message = error?.message || String(error);
@@ -37,20 +64,20 @@ function hydrateLazyImageElement(
 	if (img.loading === "lazy") img.loading = "eager";
 
 	if (!img.getAttribute("src")) {
-		for (const attr of lazyAttrCandidates) {
-			const src = String(img.getAttribute(attr) || "").trim();
-			if (!src) continue;
-			img.setAttribute("src", src);
-			break;
+		const lazySrc = lazyAttrCandidates
+			.map((attr) => String(img.getAttribute(attr) || "").trim())
+			.find(Boolean);
+		if (lazySrc) {
+			img.setAttribute("src", lazySrc);
 		}
 	}
 
 	if (!img.getAttribute("srcset")) {
-		for (const attr of lazySrcsetAttrCandidates) {
-			const srcset = String(img.getAttribute(attr) || "").trim();
-			if (!srcset) continue;
-			img.setAttribute("srcset", srcset);
-			break;
+		const lazySrcset = lazySrcsetAttrCandidates
+			.map((attr) => String(img.getAttribute(attr) || "").trim())
+			.find(Boolean);
+		if (lazySrcset) {
+			img.setAttribute("srcset", lazySrcset);
 		}
 	}
 }
@@ -143,22 +170,9 @@ async function stabilizePage(page, path = "") {
 	try {
 		await page.addStyleTag({
 			content: `
-        header .sub-menu,
-        header .mega-menu,
-        header .mega-sub-menu,
-        header .elementor-nav-menu--dropdown,
-        header .elementor-nav-menu__container,
-        .elementor-location-header .sub-menu,
-        .elementor-location-header .mega-menu,
-        .elementor-location-header .mega-sub-menu,
-        .elementor-location-header .elementor-nav-menu--dropdown,
-        .main-header .sub-menu,
-        .main-header .mega-menu,
-        .main-header .mega-sub-menu,
-        .main-header .elementor-nav-menu--dropdown,
-        nav .sub-menu,
-        nav .mega-menu,
-        nav .mega-sub-menu {
+	:is(header, .elementor-location-header, .main-header, nav) :is(.sub-menu, .mega-menu, .mega-sub-menu),
+	:is(header, .elementor-location-header, .main-header) .elementor-nav-menu--dropdown,
+	header .elementor-nav-menu__container {
           display: none !important;
           visibility: hidden !important;
           opacity: 0 !important;
@@ -232,28 +246,8 @@ async function stabilizePage(page, path = "") {
         `,
 			});
 
-			await page.evaluate(async (lazyAttrCandidates) => {
+			await page.evaluate(async ({ lazyAttrCandidates, partnerKeywords }) => {
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-				const partnerKeywords = [
-					"cisco",
-					"aws",
-					"google cloud",
-					"red hat",
-					"openstack",
-					"lenovo",
-					"dell",
-					"netapp",
-					"servicenow",
-					"ethereum",
-					"polygon",
-					"paypal",
-					"coinbase",
-					"cardano",
-					"binance",
-					"metamask",
-					"stripe",
-					"solana",
-				];
 
 				const logoImages = Array.from(document.querySelectorAll("img"));
 				for (const img of logoImages) {
@@ -292,7 +286,10 @@ async function stabilizePage(page, path = "") {
 				}
 
 				window.scrollTo(0, 0);
-			}, LAZY_ATTR_CANDIDATES);
+			}, {
+				lazyAttrCandidates: LAZY_ATTR_CANDIDATES,
+				partnerKeywords: PARTNER_KEYWORDS,
+			});
 		} catch (e) {
 			warnNonFatal("partners stabilization", e);
 		}
@@ -333,7 +330,7 @@ async function stabilizePage(page, path = "") {
         `,
 			});
 
-			await page.evaluate(async (lazyAttrCandidates) => {
+			await page.evaluate(async ({ lazyAttrCandidates, anchors }) => {
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 				// Force lazy assets and animation styles into final state.
@@ -358,14 +355,6 @@ async function stabilizePage(page, path = "") {
 				}
 
 				// Warm up the sections that are often animation-triggered on this page.
-				const anchors = [
-					"h1",
-					"h2",
-					"form",
-					'input[type="file"]',
-					'button[type="submit"]',
-				];
-
 				for (const selector of anchors) {
 					for (const node of Array.from(document.querySelectorAll(selector))) {
 						node.scrollIntoView({ behavior: "instant", block: "center" });
@@ -374,7 +363,10 @@ async function stabilizePage(page, path = "") {
 				}
 
 				window.scrollTo(0, 0);
-			}, LAZY_ATTR_CANDIDATES);
+			}, {
+				lazyAttrCandidates: LAZY_ATTR_CANDIDATES,
+				anchors: CAREERS_WARMUP_ANCHORS,
+			});
 		} catch (e) {
 			warnNonFatal("careers stabilization", e);
 		}

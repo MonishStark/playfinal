@@ -1,7 +1,7 @@
 /** @format */
 
 async function safeGoto(page, url, options = {}, retries = 2) {
-	for (let attempt = 1; attempt <= retries + 1; attempt++) {
+	for (let attempt = 0; attempt <= retries; attempt++) {
 		try {
 			const response = await page.goto(url, {
 				waitUntil: "domcontentloaded",
@@ -31,12 +31,12 @@ async function safeGoto(page, url, options = {}, retries = 2) {
 				message.includes("net::") ||
 				/HTTP\s+5\d\d\b/.test(message);
 
-			if (!isNetworkError || attempt > retries) {
+			if (!isNetworkError || attempt === retries) {
 				throw err;
 			}
 
 			// small backoff before retry
-			await page.waitForTimeout(1500 * attempt);
+			await page.waitForTimeout(1500 * (attempt + 1));
 		}
 	}
 }
