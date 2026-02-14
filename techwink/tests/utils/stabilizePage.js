@@ -328,9 +328,13 @@ async function stabilizePage(page, path = "") {
 
 			await page.evaluate(async ({ anchors }) => {
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+				const visibilityFixSelector =
+					'[style*="opacity"], [style*="visibility"], .elementor-invisible, .wow, [data-aos], [data-animate], [data-settings*="animation"], [data-settings*="_animation"], [class*="fade"], [class*="slide"], [class*="zoom"], .animated';
 
 				// Force lazy assets and animation styles into final state.
-				for (const el of Array.from(document.querySelectorAll("*"))) {
+				for (const el of Array.from(
+					document.querySelectorAll(visibilityFixSelector),
+				)) {
 					const style = window.getComputedStyle(el);
 					if (Number.parseFloat(style.opacity || "1") < 1) {
 						el.style.setProperty("opacity", "1", "important");
@@ -397,8 +401,12 @@ async function stabilizePage(page, path = "") {
 
 			await page.evaluate(async (isExtraDeep) => {
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+				const visibilityFixSelector =
+					'[style*="opacity"], [style*="visibility"], .elementor-invisible, .wow, [data-aos], [data-animate], [data-settings*="animation"], [data-settings*="_animation"], [class*="fade"], [class*="slide"], [class*="zoom"], .animated';
 
-				const allNodes = Array.from(document.querySelectorAll("*"));
+				const allNodes = Array.from(
+					document.querySelectorAll(visibilityFixSelector),
+				);
 				for (const node of allNodes) {
 					const style = window.getComputedStyle(node);
 					if (Number.parseFloat(style.opacity || "1") < 1) {
