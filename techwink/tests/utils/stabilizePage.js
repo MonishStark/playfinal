@@ -32,6 +32,7 @@ const PARTNER_KEYWORDS = [
 	"dell",
 	"netapp",
 	"servicenow",
+	"service now",
 	"ethereum",
 	"polygon",
 	"paypal",
@@ -49,6 +50,12 @@ const CAREERS_WARMUP_ANCHORS = [
 	'input[type="file"]',
 	'button[type="submit"]',
 ];
+
+function buildPartnerAltSelectors(partnerKeywords) {
+	return partnerKeywords
+		.map((keyword) => `img[alt*="${keyword}" i]`)
+		.join(",\n          ");
+}
 
 function warnNonFatal(context, error) {
 	const message = error?.message || String(error);
@@ -214,30 +221,14 @@ async function stabilizePage(page, path = "") {
 	// 4.1️⃣ Partners page: force all partner logos to visible/eager and warm them up.
 	if (path.startsWith(PARTNERS_PATH)) {
 		try {
+			const partnerAltSelectors = buildPartnerAltSelectors(PARTNER_KEYWORDS);
+
 			await page.addStyleTag({
 				content: `
           /* Keep partner logos fully visible for deterministic snapshots */
           .elementor-widget-image img,
           .elementor-image img,
-					img[alt*="Dell" i],
-					img[alt*="NetApp" i],
-					img[alt*="ServiceNow" i],
-					img[alt*="Service Now" i],
-					img[alt*="Cisco" i],
-					img[alt*="AWS" i],
-					img[alt*="Google Cloud" i],
-					img[alt*="Red Hat" i],
-					img[alt*="OpenStack" i],
-					img[alt*="Lenovo" i],
-					img[alt*="Ethereum" i],
-					img[alt*="Polygon" i],
-					img[alt*="Paypal" i],
-					img[alt*="Coinbase" i],
-					img[alt*="Cardano" i],
-					img[alt*="Binance" i],
-					img[alt*="Metamask" i],
-					img[alt*="Stripe" i],
-					img[alt*="Solana" i] {
+					${partnerAltSelectors} {
             opacity: 1 !important;
             visibility: visible !important;
             filter: none !important;
@@ -260,12 +251,10 @@ async function stabilizePage(page, path = "") {
 						.join(" ")
 						.toLowerCase();
 
+					const searchableText = `${alt} ${src} ${lazyAttrText}`;
 					const isPartnerLogo =
-						partnerKeywords.some((kw) => alt.includes(kw)) ||
-						src.includes("partner") ||
-						src.includes("servicenow") ||
-						lazyAttrText.includes("partner") ||
-						lazyAttrText.includes("servicenow");
+						partnerKeywords.some((kw) => searchableText.includes(kw)) ||
+						searchableText.includes("partner");
 
 					if (!isPartnerLogo) continue;
 
