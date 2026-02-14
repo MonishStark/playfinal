@@ -23,6 +23,11 @@ const LAZY_ATTR_CANDIDATES = [
 ];
 const LAZY_SRCSET_ATTR_CANDIDATES = ["data-srcset", "data-lazy-srcset"];
 
+function warnNonFatal(context, error) {
+	const message = error?.message || String(error);
+	console.warn(`[stabilizePage] ${context}: ${message}`);
+}
+
 function hydrateLazyImageElement(
 	img,
 	{ lazyAttrCandidates, lazySrcsetAttrCandidates },
@@ -133,7 +138,9 @@ async function stabilizePage(page, path = "") {
       `;
 			document.head.appendChild(style);
 		});
-	} catch {}
+	} catch (e) {
+		warnNonFatal("animation stabilization", e);
+	}
 
 	// 3.1️⃣ Ensure header dropdown/mega-menu overlays are never captured.
 	try {
@@ -186,7 +193,9 @@ async function stabilizePage(page, path = "") {
 					);
 				});
 		});
-	} catch {}
+	} catch (e) {
+		warnNonFatal("header dropdown stabilization", e);
+	}
 
 	// 4️⃣ Force eager images (safe per-image)
 	await hydrateLazyImages(page);
@@ -228,6 +237,26 @@ async function stabilizePage(page, path = "") {
 
 			await page.evaluate(async (lazyAttrCandidates) => {
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+				const partnerKeywords = [
+					"cisco",
+					"aws",
+					"google cloud",
+					"red hat",
+					"openstack",
+					"lenovo",
+					"dell",
+					"netapp",
+					"service",
+					"ethereum",
+					"polygon",
+					"paypal",
+					"coinbase",
+					"cardano",
+					"binance",
+					"metamask",
+					"stripe",
+					"solana",
+				];
 
 				const logoImages = Array.from(document.querySelectorAll("img"));
 				for (const img of logoImages) {
@@ -239,24 +268,7 @@ async function stabilizePage(page, path = "") {
 						.toLowerCase();
 
 					const isPartnerLogo =
-						alt.includes("cisco") ||
-						alt.includes("aws") ||
-						alt.includes("google cloud") ||
-						alt.includes("red hat") ||
-						alt.includes("openstack") ||
-						alt.includes("lenovo") ||
-						alt.includes("dell") ||
-						alt.includes("netapp") ||
-						alt.includes("service") ||
-						alt.includes("ethereum") ||
-						alt.includes("polygon") ||
-						alt.includes("paypal") ||
-						alt.includes("coinbase") ||
-						alt.includes("cardano") ||
-						alt.includes("binance") ||
-						alt.includes("metamask") ||
-						alt.includes("stripe") ||
-						alt.includes("solana") ||
+						partnerKeywords.some((kw) => alt.includes(kw)) ||
 						src.includes("partner") ||
 						src.includes("servicenow") ||
 						lazyAttrText.includes("partner") ||
@@ -284,7 +296,9 @@ async function stabilizePage(page, path = "") {
 
 				window.scrollTo(0, 0);
 			}, LAZY_ATTR_CANDIDATES);
-		} catch {}
+		} catch (e) {
+			warnNonFatal("partners stabilization", e);
+		}
 	}
 
 	// 4.2️⃣ Careers page: reveal animation-gated cards/form blocks that can stay faded.
@@ -364,7 +378,9 @@ async function stabilizePage(page, path = "") {
 
 				window.scrollTo(0, 0);
 			}, LAZY_ATTR_CANDIDATES);
-		} catch {}
+		} catch (e) {
+			warnNonFatal("careers stabilization", e);
+		}
 	}
 
 	// 4.3️⃣ Deep hydration pass for high-scroll / lazy-heavy pages.
@@ -502,9 +518,13 @@ async function stabilizePage(page, path = "") {
 				await page.waitForLoadState("networkidle", {
 					timeout: isExtraDeepHydration ? 22000 : 15000,
 				});
-			} catch {}
+			} catch (e) {
+				warnNonFatal("deep hydration network idle", e);
+			}
 			await page.waitForTimeout(isExtraDeepHydration ? 1600 : 1000);
-		} catch {}
+		} catch (e) {
+			warnNonFatal("deep hydration block", e);
+		}
 	}
 
 	// 5️⃣ Initial settle
@@ -539,14 +559,18 @@ async function stabilizePage(page, path = "") {
 				await page.waitForTimeout(delay);
 			}
 		}
-	} catch {}
+	} catch (e) {
+		warnNonFatal("navigation-safe scroll", e);
+	}
 
 	page.off("framenavigated", onNav);
 
 	// 7️⃣ Back to top
 	try {
 		await page.evaluate(() => window.scrollTo(0, 0));
-	} catch {}
+	} catch (e) {
+		warnNonFatal("scroll reset to top", e);
+	}
 
 	// 8️⃣ Wait for visible images to fully load/decode
 	try {
@@ -594,7 +618,9 @@ async function stabilizePage(page, path = "") {
 				imageLoadTimeoutMs: IMAGE_LOAD_TIMEOUT_MS,
 			},
 		);
-	} catch {}
+	} catch (e) {
+		warnNonFatal("image decode settle", e);
+	}
 
 	// 9️⃣ Final settle
 	try {
@@ -605,7 +631,9 @@ async function stabilizePage(page, path = "") {
 					: 15000
 				: 5000,
 		});
-	} catch {}
+	} catch (e) {
+		warnNonFatal("final network idle", e);
+	}
 	await page.waitForTimeout(
 		needsDeepHydration ? (isExtraDeepHydration ? 2000 : 1400) : 800,
 	);
@@ -617,7 +645,9 @@ async function stabilizePage(page, path = "") {
 			document.documentElement.style.height = h + "px";
 			document.body.style.height = h + "px";
 		});
-	} catch {}
+	} catch (e) {
+		warnNonFatal("freeze document height", e);
+	}
 }
 
 module.exports = stabilizePage;
