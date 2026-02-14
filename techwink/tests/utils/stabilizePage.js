@@ -257,8 +257,6 @@ async function stabilizePartnersPage(page) {
         `,
 		});
 
-		await hydrateLazyImages(page);
-
 		await page.evaluate(
 			async ({
 				lazyAttrCandidates,
@@ -339,8 +337,6 @@ async function stabilizeCareersPage(page) {
           }
         `,
 		});
-
-		await hydrateLazyImages(page);
 		await page.evaluate(forceElementsVisible, VISIBILITY_FIX_SELECTOR);
 
 		await page.evaluate(
