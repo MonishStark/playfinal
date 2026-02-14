@@ -1,5 +1,7 @@
 /** @format */
 
+const RETRY_BASE_DELAY_MS = 1500;
+
 async function safeGoto(page, url, options = {}, retries = 2) {
 	for (let attempt = 0; attempt <= retries; attempt++) {
 		try {
@@ -35,8 +37,8 @@ async function safeGoto(page, url, options = {}, retries = 2) {
 				throw err;
 			}
 
-			// small backoff before retry
-			await page.waitForTimeout(1500 * (attempt + 1));
+			// Exponential backoff before retry
+			await page.waitForTimeout(RETRY_BASE_DELAY_MS * Math.pow(2, attempt));
 		}
 	}
 }

@@ -5,6 +5,7 @@ const NO_SCROLL_PAGES = [
 ];
 const PARTNERS_PATH = "/partners/";
 const CAREERS_PATH = "/careers/";
+const FONTS_READY_TIMEOUT_MS = 5000;
 const EXTRA_DEEP_HYDRATION_PATHS = [
 	"/services/",
 	CAREERS_PATH,
@@ -14,6 +15,17 @@ const EXTRA_DEEP_HYDRATION_PATHS = [
 	"/services/startup-product-development/",
 ];
 const IMAGE_LOAD_TIMEOUT_MS = 8000;
+const HYDRATE_IMAGE_CONCURRENCY = 8;
+const HEADER_MENU_PANEL_SELECTOR =
+	'.elementor-nav-menu--dropdown, .elementor-nav-menu__container, [class*="mega-menu"], [class*="sub-menu"]';
+const HEADER_MENU_MAX_TOP_PX = 260;
+const HEADER_MENU_MIN_WIDTH_PX = 180;
+const HEADER_MENU_MIN_HEIGHT_PX = 40;
+const HEADER_MOUSE_SAFE_X_PX = 24;
+const HEADER_MOUSE_SAFE_MIN_Y_PX = 200;
+const HEADER_MOUSE_SAFE_MAX_Y_PX = 500;
+const HEADER_MOUSE_VIEWPORT_FALLBACK_HEIGHT_PX = 800;
+const HEADER_MOUSE_BOTTOM_OFFSET_PX = 120;
 const LAZY_ATTR_CANDIDATES = [
 	"data-src",
 	"data-lazy",
@@ -92,7 +104,7 @@ function hydrateLazyImageElement(
 async function hydrateLazyImages(page) {
 	const images = page.locator("img");
 	const count = await images.count();
-	const concurrency = 8;
+	const concurrency = HYDRATE_IMAGE_CONCURRENCY;
 
 	for (let start = 0; start < count; start += concurrency) {
 		const end = Math.min(start + concurrency, count);
@@ -138,17 +150,23 @@ async function collapseHeaderDropdowns(page) {
       `,
 		});
 
-		await page.evaluate(() => {
+		await page.evaluate(
+			({
+				headerMenuPanelSelector,
+				headerMenuMaxTopPx,
+				headerMenuMinWidthPx,
+				headerMenuMinHeightPx,
+			}) => {
 			const maybeMenuPanels = Array.from(
-				document.querySelectorAll(
-					'.sub-menu, .mega-menu, .mega-sub-menu, .elementor-nav-menu--dropdown, .elementor-nav-menu__container, [class*="mega-menu"], [class*="sub-menu"]',
-				),
+				document.querySelectorAll(headerMenuPanelSelector),
 			);
 
 			for (const panel of maybeMenuPanels) {
 				const rect = panel.getBoundingClientRect();
-				const nearTop = rect.top <= 260;
-				const sizeable = rect.width >= 180 || rect.height >= 40;
+				const nearTop = rect.top <= headerMenuMaxTopPx;
+				const sizeable =
+					rect.width >= headerMenuMinWidthPx ||
+					rect.height >= headerMenuMinHeightPx;
 				const hasMenuRole =
 					panel.matches('[role="menu"], [role="menubar"]') ||
 					panel.querySelector('[role="menuitem"], a, button');
@@ -170,7 +188,7 @@ async function collapseHeaderDropdowns(page) {
 
 			document
 				.querySelectorAll(
-					"header .current-menu-ancestor, header .current_page_ancestor, header .open, header .show, header .active, nav .open, nav .show, nav .active",
+					"header .current-menu-ancestor, header .current_page_ancestor, :is(header, nav) :is(.open, .show, .active)",
 				)
 				.forEach((el) => {
 					el.classList.remove(
@@ -181,11 +199,25 @@ async function collapseHeaderDropdowns(page) {
 						"current_page_ancestor",
 					);
 				});
-		});
+			},
+			{
+				headerMenuPanelSelector: HEADER_MENU_PANEL_SELECTOR,
+				headerMenuMaxTopPx: HEADER_MENU_MAX_TOP_PX,
+				headerMenuMinWidthPx: HEADER_MENU_MIN_WIDTH_PX,
+				headerMenuMinHeightPx: HEADER_MENU_MIN_HEIGHT_PX,
+			},
+		);
 
 		const viewport = page.viewportSize();
-		const safeY = Math.min(500, Math.max(200, (viewport?.height || 800) - 120));
-		await page.mouse.move(24, safeY);
+		const safeY = Math.min(
+			HEADER_MOUSE_SAFE_MAX_Y_PX,
+			Math.max(
+				HEADER_MOUSE_SAFE_MIN_Y_PX,
+				(viewport?.height || HEADER_MOUSE_VIEWPORT_FALLBACK_HEIGHT_PX) -
+					HEADER_MOUSE_BOTTOM_OFFSET_PX,
+			),
+		);
+		await page.mouse.move(HEADER_MOUSE_SAFE_X_PX, safeY);
 	} catch (e) {
 		warnNonFatal("collapse header dropdowns", e);
 	}
@@ -203,7 +235,7 @@ async function stabilizePage(page, path = "") {
 	try {
 		await page.waitForFunction(
 			() => document.fonts && document.fonts.status === "loaded",
-			{ timeout: 5000 },
+			{ timeout: FONTS_READY_TIMEOUT_MS },
 		);
 	} catch (e) {
 		console.warn(`Could not wait for fonts to load: ${e.message}`);
