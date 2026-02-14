@@ -25,6 +25,7 @@ const DEEP_HYDRATION_POST_WAIT_MS = 1000;
 const EXTRA_DEEP_HYDRATION_POST_WAIT_MS = 1600;
 const DEEP_HYDRATION_FINAL_WAIT_MS = 1400;
 const EXTRA_DEEP_HYDRATION_FINAL_WAIT_MS = 2000;
+const FORCE_VISIBLE_OPACITY_THRESHOLD = 0.05;
 const HYDRATE_IMAGE_CONCURRENCY = 8;
 const HEADER_MENU_PANEL_SELECTOR =
 	'.elementor-nav-menu--dropdown, .elementor-nav-menu__container, [class*="mega-menu"], [class*="sub-menu"]';
@@ -76,7 +77,7 @@ const CAREERS_WARMUP_ANCHORS = [
 
 function buildPartnerAltSelectors(partnerKeywords) {
 	return partnerKeywords
-		.map((keyword) => `img[alt*="${keyword}" i]`)
+		.map((keyword) => `img[alt*="${keyword.replace(/"/g, '\\"')}" i]`)
 		.join(",\n          ");
 }
 
@@ -111,7 +112,10 @@ function hydrateLazyImageElement(
 function forceElementsVisible(selector) {
 	for (const el of Array.from(document.querySelectorAll(selector))) {
 		const style = window.getComputedStyle(el);
-		if (Number.parseFloat(style.opacity || "1") < 1) {
+		if (
+			Number.parseFloat(style.opacity || "1") <=
+			FORCE_VISIBLE_OPACITY_THRESHOLD
+		) {
 			el.style.setProperty("opacity", "1", "important");
 		}
 		if (style.visibility === "hidden") {
