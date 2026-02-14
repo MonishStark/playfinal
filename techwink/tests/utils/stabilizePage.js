@@ -276,7 +276,7 @@ async function stabilizePartnersPage(page) {
 					const searchableText = `${alt} ${src} ${lazyAttrText}`;
 					const isPartnerLogo =
 						partnerKeywords.some((kw) => searchableText.includes(kw)) ||
-						searchableText.includes("partner");
+						/\bpartners?\b/.test(searchableText);
 
 					if (!isPartnerLogo) continue;
 
@@ -472,12 +472,20 @@ async function stabilizePage(page, path = "") {
 				const SCROLL_DELAY_MS = isExtraDeep ? 300 : 220;
 				const ANCHOR_LIMIT = isExtraDeep ? 320 : 220;
 				const ANCHOR_DELAY_MS = isExtraDeep ? 95 : 70;
+				const ANCHOR_SELECTOR =
+					"section, .elementor-section, .elementor-widget, .elementor-widget-container, form, .service-box, .service-card, .career-card";
 
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+				const dispatchScrollSignals = () => {
+					window.dispatchEvent(new Event("scroll"));
+					window.dispatchEvent(new Event("resize"));
+				};
 
-				for (const iframe of Array.from(document.querySelectorAll("iframe"))) {
-					iframe.setAttribute("loading", "eager");
-				}
+				const warmIframes = () => {
+					for (const iframe of Array.from(document.querySelectorAll("iframe"))) {
+						iframe.setAttribute("loading", "eager");
+					}
+				};
 
 				const getHeight = () =>
 					Math.max(
@@ -487,33 +495,36 @@ async function stabilizePage(page, path = "") {
 						document.documentElement.offsetHeight,
 					);
 
-				const viewport = Math.max(window.innerHeight || 800, 800);
-				const step = Math.max(180, Math.floor(viewport * SCROLL_STEP_RATIO));
-				let height = getHeight();
+				const scrollFullPage = async () => {
+					const viewport = Math.max(window.innerHeight || 800, 800);
+					const step = Math.max(180, Math.floor(viewport * SCROLL_STEP_RATIO));
+					let height = getHeight();
 
-				for (let y = 0; y <= height; y += step) {
-					window.scrollTo(0, y);
-					window.dispatchEvent(new Event("scroll"));
-					window.dispatchEvent(new Event("resize"));
-					await delay(SCROLL_DELAY_MS);
+					for (let y = 0; y <= height; y += step) {
+						window.scrollTo(0, y);
+						dispatchScrollSignals();
+						await delay(SCROLL_DELAY_MS);
 
-					const newHeight = getHeight();
-					if (newHeight > height) height = newHeight;
-				}
+						const newHeight = getHeight();
+						if (newHeight > height) height = newHeight;
+					}
+				};
 
-				const anchors = Array.from(
-					document.querySelectorAll(
-						"section, .elementor-section, .elementor-widget, .elementor-widget-container, form, .service-box, .service-card, .career-card",
-					),
-				)
-					.filter((el) => el.getBoundingClientRect().width > 10)
-					.slice(0, ANCHOR_LIMIT);
+				const warmupAnchors = async () => {
+					const anchors = Array.from(document.querySelectorAll(ANCHOR_SELECTOR))
+						.filter((el) => el.getBoundingClientRect().width > 10)
+						.slice(0, ANCHOR_LIMIT);
 
-				for (const el of anchors) {
-					el.scrollIntoView({ behavior: "instant", block: "center" });
-					window.dispatchEvent(new Event("scroll"));
-					await delay(ANCHOR_DELAY_MS);
-				}
+					for (const el of anchors) {
+						el.scrollIntoView({ behavior: "instant", block: "center" });
+						window.dispatchEvent(new Event("scroll"));
+						await delay(ANCHOR_DELAY_MS);
+					}
+				};
+
+				warmIframes();
+				await scrollFullPage();
+				await warmupAnchors();
 
 				window.scrollTo(0, 0);
 				window.dispatchEvent(new Event("scroll"));

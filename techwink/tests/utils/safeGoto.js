@@ -30,7 +30,10 @@ async function safeGoto(page, url, options = {}, retries = 2) {
 			}
 
 			// Exponential backoff before retry
-			await page.waitForTimeout(RETRY_BASE_DELAY_MS * Math.pow(2, attempt));
+			const jitter = 0.8 + Math.random() * 0.4;
+			await page.waitForTimeout(
+				RETRY_BASE_DELAY_MS * Math.pow(2, attempt) * jitter,
+			);
 		}
 	}
 }
