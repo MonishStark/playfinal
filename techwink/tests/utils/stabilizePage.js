@@ -342,10 +342,6 @@ async function stabilizeCareersPage(page) {
 			async ({ anchors, careersAnchorWarmupDelayMs }) => {
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-				for (const img of Array.from(document.querySelectorAll("img"))) {
-					img.loading = "eager";
-				}
-
 				// Warm up the sections that are often animation-triggered on this page.
 				for (const node of Array.from(document.querySelectorAll(anchors.join(",")))) {
 					node.scrollIntoView({ behavior: "instant", block: "center" });

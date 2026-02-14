@@ -16,14 +16,6 @@ async function safeGoto(page, url, options = {}, retries = 2) {
 				throw new Error(`HTTP ${status} while navigating to ${url}`);
 			}
 
-			try {
-				await page.waitForLoadState("networkidle", { timeout: 10000 });
-			} catch (e) {
-				console.warn(
-					`[safeGoto] Timed out waiting for networkidle on ${url}: ${e.message}`,
-				);
-			}
-
 			return;
 		} catch (err) {
 			const message = String(err?.message || "");
