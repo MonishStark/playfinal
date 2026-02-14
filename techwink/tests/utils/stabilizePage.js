@@ -530,7 +530,7 @@ async function stabilizePage(page, path = "") {
 					);
 
 				const scrollFullPage = async () => {
-					const viewport = Math.max(window.innerHeight || 800, 800);
+					const viewport = Math.max(window.innerHeight || 0, 800);
 					const step = Math.max(180, Math.floor(viewport * SCROLL_STEP_RATIO));
 					let height = getHeight();
 
