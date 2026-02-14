@@ -219,25 +219,25 @@ async function stabilizePage(page, path = "") {
           /* Keep partner logos fully visible for deterministic snapshots */
           .elementor-widget-image img,
           .elementor-image img,
-          img[alt*="Dell"],
-          img[alt*="NetApp"],
-          img[alt*="ServiceNow"],
-          img[alt*="Service Now"],
-          img[alt*="Cisco"],
-          img[alt*="AWS"],
-          img[alt*="Google Cloud"],
-          img[alt*="Red Hat"],
-          img[alt*="OpenStack"],
-          img[alt*="Lenovo"],
-          img[alt*="Ethereum"],
-          img[alt*="Polygon"],
-          img[alt*="Paypal"],
-          img[alt*="Coinbase"],
-          img[alt*="Cardano"],
-          img[alt*="Binance"],
-          img[alt*="Metamask"],
-          img[alt*="Stripe"],
-          img[alt*="Solana"] {
+					img[alt*="Dell" i],
+					img[alt*="NetApp" i],
+					img[alt*="ServiceNow" i],
+					img[alt*="Service Now" i],
+					img[alt*="Cisco" i],
+					img[alt*="AWS" i],
+					img[alt*="Google Cloud" i],
+					img[alt*="Red Hat" i],
+					img[alt*="OpenStack" i],
+					img[alt*="Lenovo" i],
+					img[alt*="Ethereum" i],
+					img[alt*="Polygon" i],
+					img[alt*="Paypal" i],
+					img[alt*="Coinbase" i],
+					img[alt*="Cardano" i],
+					img[alt*="Binance" i],
+					img[alt*="Metamask" i],
+					img[alt*="Stripe" i],
+					img[alt*="Solana" i] {
             opacity: 1 !important;
             visibility: visible !important;
             filter: none !important;
@@ -245,6 +245,8 @@ async function stabilizePage(page, path = "") {
           }
         `,
 			});
+
+			await hydrateLazyImages(page);
 
 			await page.evaluate(async ({ lazyAttrCandidates, partnerKeywords }) => {
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -266,14 +268,6 @@ async function stabilizePage(page, path = "") {
 						lazyAttrText.includes("servicenow");
 
 					if (!isPartnerLogo) continue;
-
-					const lazySrc = lazyAttrCandidates
-						.map((attr) => String(img.getAttribute(attr) || "").trim())
-						.find(Boolean);
-
-					if (lazySrc && !img.getAttribute("src")) {
-						img.setAttribute("src", lazySrc);
-					}
 
 					img.loading = "eager";
 					img.style.setProperty("opacity", "1", "important");
@@ -330,7 +324,9 @@ async function stabilizePage(page, path = "") {
         `,
 			});
 
-			await page.evaluate(async ({ lazyAttrCandidates, anchors }) => {
+			await hydrateLazyImages(page);
+
+			await page.evaluate(async ({ anchors }) => {
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 				// Force lazy assets and animation styles into final state.
@@ -345,12 +341,6 @@ async function stabilizePage(page, path = "") {
 				}
 
 				for (const img of Array.from(document.querySelectorAll("img"))) {
-					const lazySrc = lazyAttrCandidates
-						.map((attr) => String(img.getAttribute(attr) || "").trim())
-						.find(Boolean);
-					if (lazySrc && !img.getAttribute("src")) {
-						img.setAttribute("src", lazySrc);
-					}
 					img.loading = "eager";
 				}
 
@@ -364,7 +354,6 @@ async function stabilizePage(page, path = "") {
 
 				window.scrollTo(0, 0);
 			}, {
-				lazyAttrCandidates: LAZY_ATTR_CANDIDATES,
 				anchors: CAREERS_WARMUP_ANCHORS,
 			});
 		} catch (e) {
