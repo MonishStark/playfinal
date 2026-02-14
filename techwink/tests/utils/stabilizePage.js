@@ -23,6 +23,50 @@ const LAZY_ATTR_CANDIDATES = [
 ];
 const LAZY_SRCSET_ATTR_CANDIDATES = ["data-srcset", "data-lazy-srcset"];
 
+function hydrateLazyImageElement(
+	img,
+	{ lazyAttrCandidates, lazySrcsetAttrCandidates },
+) {
+	if (!img) return;
+
+	if (img.loading === "lazy") img.loading = "eager";
+
+	if (!img.getAttribute("src")) {
+		for (const attr of lazyAttrCandidates) {
+			const src = String(img.getAttribute(attr) || "").trim();
+			if (!src) continue;
+			img.setAttribute("src", src);
+			break;
+		}
+	}
+
+	if (!img.getAttribute("srcset")) {
+		for (const attr of lazySrcsetAttrCandidates) {
+			const srcset = String(img.getAttribute(attr) || "").trim();
+			if (!srcset) continue;
+			img.setAttribute("srcset", srcset);
+			break;
+		}
+	}
+}
+
+async function hydrateLazyImages(page) {
+	const images = page.locator("img");
+	const count = await images.count();
+
+	for (let i = 0; i < count; i++) {
+		try {
+			await images.nth(i).evaluate(
+				hydrateLazyImageElement,
+				{
+					lazyAttrCandidates: LAZY_ATTR_CANDIDATES,
+					lazySrcsetAttrCandidates: LAZY_SRCSET_ATTR_CANDIDATES,
+				},
+			);
+		} catch {}
+	}
+}
+
 function isNoScrollPath(path) {
 	return NO_SCROLL_PAGES.some((p) => path.startsWith(p));
 }
@@ -138,56 +182,7 @@ async function stabilizePage(page, path = "") {
 	} catch {}
 
 	// 4️⃣ Force eager images (safe per-image)
-	const images = page.locator("img");
-	const count = await images.count();
-
-	for (let i = 0; i < count; i++) {
-		try {
-			await images.nth(i).evaluate((img) => {
-				if (img.loading === "lazy") img.loading = "eager";
-
-				const lazySrcCandidates = [
-					img.dataset?.src,
-					img.dataset?.lazy,
-					img.dataset?.lazySrc,
-					img.dataset?.original,
-					img.getAttribute("data-src"),
-					img.getAttribute("data-lazy"),
-					img.getAttribute("data-lazy-src"),
-					img.getAttribute("data-original"),
-					img.getAttribute("data-bg"),
-				];
-
-				for (const src of lazySrcCandidates) {
-					const value = String(src || "").trim();
-					if (!value) continue;
-					if (!img.getAttribute("src") || img.getAttribute("src") === "") {
-						img.setAttribute("src", value);
-					}
-					break;
-				}
-
-				const lazySrcsetCandidates = [
-					img.dataset?.srcset,
-					img.dataset?.lazySrcset,
-					img.getAttribute("data-srcset"),
-					img.getAttribute("data-lazy-srcset"),
-				];
-
-				for (const srcset of lazySrcsetCandidates) {
-					const value = String(srcset || "").trim();
-					if (!value) continue;
-					if (
-						!img.getAttribute("srcset") ||
-						img.getAttribute("srcset") === ""
-					) {
-						img.setAttribute("srcset", value);
-					}
-					break;
-				}
-			});
-		} catch {}
-	}
+	await hydrateLazyImages(page);
 
 	// 4.1️⃣ Partners page: force all partner logos to visible/eager and warm them up.
 	if (path.startsWith(PARTNERS_PATH)) {
@@ -409,15 +404,6 @@ async function stabilizePage(page, path = "") {
 			await page.evaluate(async (isExtraDeep) => {
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-				const lazyAttrCandidates = [
-					"data-src",
-					"data-lazy",
-					"data-lazy-src",
-					"data-original",
-					"data-bg",
-				];
-				const lazySrcsetCandidates = ["data-srcset", "data-lazy-srcset"];
-
 				const allNodes = Array.from(document.querySelectorAll("*"));
 				for (const node of allNodes) {
 					const style = window.getComputedStyle(node);
@@ -426,28 +412,6 @@ async function stabilizePage(page, path = "") {
 					}
 					if (style.visibility === "hidden") {
 						node.style.setProperty("visibility", "visible", "important");
-					}
-				}
-
-				for (const img of Array.from(document.querySelectorAll("img"))) {
-					img.loading = "eager";
-
-					if (!img.getAttribute("src")) {
-						for (const attr of lazyAttrCandidates) {
-							const v = String(img.getAttribute(attr) || "").trim();
-							if (!v) continue;
-							img.setAttribute("src", v);
-							break;
-						}
-					}
-
-					if (!img.getAttribute("srcset")) {
-						for (const attr of lazySrcsetCandidates) {
-							const v = String(img.getAttribute(attr) || "").trim();
-							if (!v) continue;
-							img.setAttribute("srcset", v);
-							break;
-						}
 					}
 				}
 
@@ -497,6 +461,8 @@ async function stabilizePage(page, path = "") {
 				window.scrollTo(0, 0);
 				window.dispatchEvent(new Event("scroll"));
 			}, isExtraDeepHydration);
+
+			await hydrateLazyImages(page);
 
 			await page
 				.waitForFunction(
@@ -585,11 +551,7 @@ async function stabilizePage(page, path = "") {
 	// 8️⃣ Wait for visible images to fully load/decode
 	try {
 		await page.evaluate(
-			async ({
-				imageLoadTimeoutMs,
-				lazyAttrCandidates,
-				lazySrcsetAttrCandidates,
-			}) => {
+			async ({ imageLoadTimeoutMs }) => {
 				const waitImageSettled = (img, timeoutMs) =>
 					new Promise((resolve) => {
 						if (img.complete && img.naturalWidth > 0) {
@@ -620,24 +582,6 @@ async function stabilizePage(page, path = "") {
 
 				await Promise.all(
 					imgs.map(async (img) => {
-						if (!img.getAttribute("src")) {
-							for (const attr of lazyAttrCandidates) {
-								const src = String(img.getAttribute(attr) || "").trim();
-								if (!src) continue;
-								img.setAttribute("src", src);
-								break;
-							}
-						}
-
-						if (!img.getAttribute("srcset")) {
-							for (const attr of lazySrcsetAttrCandidates) {
-								const srcset = String(img.getAttribute(attr) || "").trim();
-								if (!srcset) continue;
-								img.setAttribute("srcset", srcset);
-								break;
-							}
-						}
-
 						await waitImageSettled(img, imageLoadTimeoutMs);
 
 						if (img.naturalWidth > 0 && typeof img.decode === "function") {
@@ -648,8 +592,6 @@ async function stabilizePage(page, path = "") {
 			},
 			{
 				imageLoadTimeoutMs: IMAGE_LOAD_TIMEOUT_MS,
-				lazyAttrCandidates: LAZY_ATTR_CANDIDATES,
-				lazySrcsetAttrCandidates: LAZY_SRCSET_ATTR_CANDIDATES,
 			},
 		);
 	} catch {}
