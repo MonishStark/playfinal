@@ -369,6 +369,7 @@ async function stabilizePage(page, path = "") {
 	const skipScroll = isNoScrollPath(path);
 	const needsDeepHydration = !skipScroll;
 	const isExtraDeepHydration = isExtraDeepHydrationPath(path);
+	let didDeepScrollPass = false;
 
 	// 1️⃣ DOM ready
 	await page.waitForLoadState("domcontentloaded");
@@ -522,6 +523,7 @@ async function stabilizePage(page, path = "") {
 				window.scrollTo(0, 0);
 				window.dispatchEvent(new Event("scroll"));
 			}, isExtraDeepHydration);
+			didDeepScrollPass = true;
 
 			await hydrateLazyImages(page);
 
@@ -599,10 +601,12 @@ async function stabilizePage(page, path = "") {
 		const step = needsDeepHydration ? (isExtraDeepHydration ? 200 : 240) : 350;
 		const delay = needsDeepHydration ? (isExtraDeepHydration ? 260 : 210) : 160;
 
-		for (let y = 0; y <= height; y += step) {
-			if (navigated) break;
-			await page.evaluate((yy) => window.scrollTo(0, yy), y);
-			await page.waitForTimeout(delay);
+		if (!didDeepScrollPass) {
+			for (let y = 0; y <= height; y += step) {
+				if (navigated) break;
+				await page.evaluate((yy) => window.scrollTo(0, yy), y);
+				await page.waitForTimeout(delay);
+			}
 		}
 
 		if (needsDeepHydration && !navigated) {
