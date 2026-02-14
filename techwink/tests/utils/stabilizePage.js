@@ -81,6 +81,29 @@ function buildPartnerAltSelectors(partnerKeywords) {
 		.join(",\n          ");
 }
 
+function buildPartnerImagePrefilterSelector(partnerKeywords, lazyAttrCandidates) {
+	const escapedKeywords = partnerKeywords.map((keyword) =>
+		keyword.replace(/"/g, '\\"'),
+	);
+	const selectors = [];
+
+	for (const keyword of escapedKeywords) {
+		selectors.push(`img[alt*="${keyword}" i]`);
+		selectors.push(`img[src*="${keyword}" i]`);
+		for (const attr of lazyAttrCandidates) {
+			selectors.push(`img[${attr}*="${keyword}" i]`);
+		}
+	}
+
+	selectors.push('img[alt*="partner" i]');
+	selectors.push('img[src*="partner" i]');
+	for (const attr of lazyAttrCandidates) {
+		selectors.push(`img[${attr}*="partner" i]`);
+	}
+
+	return selectors.join(", ");
+}
+
 function warnNonFatal(context, error) {
 	const message = error?.message || String(error);
 	console.warn(`[stabilizePage] ${context}: ${message}`);
@@ -245,6 +268,10 @@ async function collapseHeaderDropdowns(page) {
 async function stabilizePartnersPage(page) {
 	try {
 		const partnerAltSelectors = buildPartnerAltSelectors(PARTNER_KEYWORDS);
+		const partnerImagePrefilterSelector = buildPartnerImagePrefilterSelector(
+			PARTNER_KEYWORDS,
+			LAZY_ATTR_CANDIDATES,
+		);
 
 		await page.addStyleTag({
 			content: `
@@ -263,12 +290,15 @@ async function stabilizePartnersPage(page) {
 		await page.evaluate(
 			async ({
 				lazyAttrCandidates,
+				partnerImagePrefilterSelector,
 				partnerKeywords,
 				partnerLogoWarmupDelayMs,
 			}) => {
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-				const logoImages = Array.from(document.querySelectorAll("img"));
+				const logoImages = Array.from(
+					document.querySelectorAll(partnerImagePrefilterSelector),
+				);
 				for (const img of logoImages) {
 					const alt = (img.getAttribute("alt") || "").toLowerCase();
 					const src = (img.getAttribute("src") || "").toLowerCase();
@@ -298,6 +328,7 @@ async function stabilizePartnersPage(page) {
 			},
 			{
 				lazyAttrCandidates: LAZY_ATTR_CANDIDATES,
+				partnerImagePrefilterSelector,
 				partnerKeywords: PARTNER_KEYWORDS,
 				partnerLogoWarmupDelayMs: PARTNER_LOGO_WARMUP_DELAY_MS,
 			},
