@@ -45,7 +45,7 @@ const LAZY_ATTR_CANDIDATES = [
 ];
 const LAZY_SRCSET_ATTR_CANDIDATES = ["data-srcset", "data-lazy-srcset"];
 const VISIBILITY_FIX_SELECTOR =
-	'[style*="opacity"], [style*="visibility"], .elementor-invisible, .wow, [data-aos], [data-animate], [data-settings*="animation"], [data-settings*="_animation"], [class*="fade"], [class*="slide"], [class*="zoom"], .animated';
+	'[style*="opacity:0"], [style*="opacity: 0"], [style*="visibility:hidden"], [style*="visibility: hidden"]';
 const PARTNER_KEYWORDS = [
 	"cisco",
 	"aws",
@@ -81,7 +81,10 @@ function buildPartnerAltSelectors(partnerKeywords) {
 		.join(",\n          ");
 }
 
-function buildPartnerImagePrefilterSelector(partnerKeywords, lazyAttrCandidates) {
+function buildPartnerImagePrefilterSelector(
+	partnerKeywords,
+	lazyAttrCandidates,
+) {
 	const allKeywords = [...new Set([...partnerKeywords, "partner"])];
 	const selectors = [];
 
@@ -129,8 +132,7 @@ function forceElementsVisible(selector) {
 	for (const el of Array.from(document.querySelectorAll(selector))) {
 		const style = window.getComputedStyle(el);
 		if (
-			Number.parseFloat(style.opacity || "1") <=
-			FORCE_VISIBLE_OPACITY_THRESHOLD
+			Number.parseFloat(style.opacity || "1") <= FORCE_VISIBLE_OPACITY_THRESHOLD
 		) {
 			el.style.setProperty("opacity", "1", "important");
 		}
@@ -371,7 +373,9 @@ async function stabilizeCareersPage(page) {
 				const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 				// Warm up the sections that are often animation-triggered on this page.
-				for (const node of Array.from(document.querySelectorAll(anchors.join(",")))) {
+				for (const node of Array.from(
+					document.querySelectorAll(anchors.join(",")),
+				)) {
 					node.scrollIntoView({ behavior: "instant", block: "center" });
 					await delay(careersAnchorWarmupDelayMs);
 				}
@@ -510,7 +514,9 @@ async function stabilizePage(page, path = "") {
 				};
 
 				const warmIframes = () => {
-					for (const iframe of Array.from(document.querySelectorAll("iframe"))) {
+					for (const iframe of Array.from(
+						document.querySelectorAll("iframe"),
+					)) {
 						iframe.setAttribute("loading", "eager");
 					}
 				};
