@@ -82,23 +82,16 @@ function buildPartnerAltSelectors(partnerKeywords) {
 }
 
 function buildPartnerImagePrefilterSelector(partnerKeywords, lazyAttrCandidates) {
-	const escapedKeywords = partnerKeywords.map((keyword) =>
-		keyword.replace(/"/g, '\\"'),
-	);
+	const allKeywords = [...new Set([...partnerKeywords, "partner"])];
 	const selectors = [];
 
-	for (const keyword of escapedKeywords) {
-		selectors.push(`img[alt*="${keyword}" i]`);
-		selectors.push(`img[src*="${keyword}" i]`);
+	for (const keyword of allKeywords) {
+		const escapedKeyword = keyword.replace(/"/g, '\\"');
+		selectors.push(`img[alt*="${escapedKeyword}" i]`);
+		selectors.push(`img[src*="${escapedKeyword}" i]`);
 		for (const attr of lazyAttrCandidates) {
-			selectors.push(`img[${attr}*="${keyword}" i]`);
+			selectors.push(`img[${attr}*="${escapedKeyword}" i]`);
 		}
-	}
-
-	selectors.push('img[alt*="partner" i]');
-	selectors.push('img[src*="partner" i]');
-	for (const attr of lazyAttrCandidates) {
-		selectors.push(`img[${attr}*="partner" i]`);
 	}
 
 	return selectors.join(", ");
